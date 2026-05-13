@@ -14,7 +14,7 @@ export function BottomNav() {
   const isNotification = location.pathname === "/social" || location.pathname === "/history";
 
   return (
-    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-full max-w-[415px] px-5 pb-4 pt-2">
+    <div className="lg:hidden fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-full max-w-[415px] px-5 pb-4 pt-2">
       <div className="flex items-center gap-3">
         {/* Main nav pill */}
         <div
