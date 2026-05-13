@@ -5,11 +5,17 @@
   background-color: #1E1E1E;
   color: #FFFFFF;
   font-family: 'Inter', system-ui, sans-serif;
-  padding-bottom: 80px; /* space for bottom nav */
+  padding-bottom: 80px;
+  /* space for bottom nav */
   width: 100%;
-  max-width: 450px;
   margin: 0 auto;
   position: relative;
+}
+
+@media (max-width: 1023px) {
+  .home-wrapper {
+    max-width: 450px;
+  }
 }
 
 /* HEADER */
@@ -20,9 +26,15 @@
   padding: 20px 24px;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
 .logo-small {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
 }
@@ -63,6 +75,31 @@
   gap: 32px;
 }
 
+.left-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Mobile specific toggle */
+@media (max-width: 1023px) {
+  .right-area {
+    display: none;
+  }
+
+  .is-expanded .right-area {
+    display: block;
+  }
+
+  .is-expanded .monthly-view {
+    display: none;
+  }
+
+  .desktop-scrollbar {
+    display: none;
+  }
+}
+
 /* GREETING */
 .greeting h1 {
   margin: 0;
@@ -82,8 +119,8 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background-color: #1E1E1E;
-  border: 1px dashed #333333;
+  background-color: #222222;
+  border: 2px dashed #282828;
   color: #666666;
   padding: 16px;
   border-radius: 12px;
@@ -210,29 +247,37 @@
   justify-content: center;
 }
 
-.calendar-card {
+.monthly-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.week-days-card {
+  background-color: #242424;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #AAAAAA;
+}
+
+.days-grid-card {
   background-color: #1A1A1A;
   border-radius: 12px;
   padding: 16px;
   position: relative;
   /* subtle geometric pattern effect using gradients */
-  background-image: linear-gradient(135deg, rgba(255,255,255,0.02) 25%, transparent 25%),
-                    linear-gradient(225deg, rgba(255,255,255,0.02) 25%, transparent 25%),
-                    linear-gradient(45deg, rgba(255,255,255,0.02) 25%, transparent 25%),
-                    linear-gradient(315deg, rgba(255,255,255,0.02) 25%, #1A1A1A 25%);
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
+    linear-gradient(225deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
+    linear-gradient(315deg, rgba(255, 255, 255, 0.02) 25%, #1A1A1A 25%);
   background-position: 10px 0, 10px 0, 0 0, 0 0;
   background-size: 40px 40px;
   background-repeat: repeat;
-}
-
-.week-days {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  margin-bottom: 12px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #AAAAAA;
 }
 
 .active-day {
@@ -274,23 +319,22 @@
 .highlight-day::before {
   content: '';
   position: absolute;
-  top: 50%;
+  top: 42%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 0;
-  height: 0;
-  border-left: 14px solid transparent;
-  border-right: 14px solid transparent;
-  border-bottom: 24px solid #8DB580;
+  width: 32px;
+  height: 30px;
+  background-color: #8DB580;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
   z-index: -1;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 .add-task-wrapper {
   grid-column: span 4;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  margin-right: -16px;
+  margin-bottom: -16px;
+  height: 48px;
 }
 
 .add-task-btn {
@@ -298,7 +342,7 @@
   color: #FFFFFF;
   border: none;
   padding: 10px 16px;
-  border-radius: 8px;
+  border-radius: 12px 0 12px 0;
   font-weight: 700;
   font-size: 0.95rem;
   display: flex;
@@ -306,20 +350,22 @@
   justify-content: center;
   gap: 8px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   width: 100%;
   height: 100%;
   /* A subtle geometric cut effect on the button */
-  background-image: linear-gradient(120deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 50%);
+  background-image: linear-gradient(120deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 50%);
 }
+
+
 
 .plus-icon-thick {
   font-size: 1.2rem;
   font-weight: bold;
 }
 
-/* BOTTOM NAV */
-.bottom-nav {
+/* MAIN NAV (Bottom on Mobile, Top Right on Desktop) */
+.main-nav {
   position: fixed;
   bottom: 0;
   left: 50%;
@@ -333,6 +379,7 @@
   align-items: center;
   padding: 0 16px;
   border-top: 1px solid #242424;
+  z-index: 10;
 }
 
 .nav-item {
@@ -366,10 +413,10 @@
   border-radius: 12px;
   padding: 16px 0;
   position: relative;
-  background-image: linear-gradient(135deg, rgba(255,255,255,0.02) 25%, transparent 25%),
-                    linear-gradient(225deg, rgba(255,255,255,0.02) 25%, transparent 25%),
-                    linear-gradient(45deg, rgba(255,255,255,0.02) 25%, transparent 25%),
-                    linear-gradient(315deg, rgba(255,255,255,0.02) 25%, #1A1A1A 25%);
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
+    linear-gradient(225deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
+    linear-gradient(315deg, rgba(255, 255, 255, 0.02) 25%, #1A1A1A 25%);
   background-position: 10px 0, 10px 0, 0 0, 0 0;
   background-size: 40px 40px;
   background-repeat: repeat;
@@ -397,7 +444,8 @@
   flex-direction: column;
 }
 
-.weekly-header-letters, .weekly-header-dates {
+.weekly-header-letters,
+.weekly-header-dates {
   display: flex;
   padding-left: 16px;
   margin-bottom: 8px;
@@ -413,9 +461,10 @@
   font-size: 0.9rem;
 }
 
-.days-letters-grid, .days-dates-grid {
+.days-letters-grid,
+.days-dates-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   flex: 1;
   text-align: center;
   font-weight: 700;
@@ -479,8 +528,8 @@
 .grid-content {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  grid-template-rows: repeat(6, 40px);
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(5, 60px);
 }
 
 .grid-cell {
@@ -492,8 +541,8 @@
   padding: 4px;
 }
 
-.grid-cell:nth-child(6n) {
-  border-right: 1px solid #333333; 
+.grid-cell:nth-child(7n) {
+  border-right: 1px solid #333333;
 }
 
 .event-block {
@@ -505,6 +554,7 @@
   border-radius: 4px;
   width: 100%;
   text-align: center;
+  white-space: pre-wrap;
 }
 
 .weekly-scrollbar {
@@ -520,4 +570,92 @@
   height: 60px;
   background-color: #333333;
   border-radius: 3px;
+}
+
+/* DESKTOP LAYOUT */
+@media (min-width: 1024px) {
+  .home-wrapper {
+    padding-bottom: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .main-content {
+    flex-direction: row;
+    height: calc(100vh - 88px);
+    gap: 40px;
+    padding: 0 40px 40px 40px;
+    overflow: hidden;
+  }
+
+  .left-sidebar {
+    width: 320px;
+    flex-shrink: 0;
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  .right-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .weekly-calendar-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .weekly-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .weekly-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .grid-content {
+    grid-template-rows: repeat(5, 1fr);
+  }
+
+  .mobile-only {
+    display: none !important;
+  }
+
+  .desktop-scrollbar {
+    display: flex !important;
+  }
+
+  /* Desktop Navigation */
+  .main-nav {
+    position: static;
+    transform: none;
+    width: auto;
+    height: auto;
+    background: transparent;
+    border: none;
+    padding: 0;
+    gap: 16px;
+    justify-content: flex-end;
+  }
+
+  .nav-item {
+    background-color: #242424;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    padding: 0;
+    color: #FFFFFF;
+  }
+
+  .nav-item.active-nav {
+    width: auto;
+    border-radius: 24px;
+    padding: 0 20px;
+  }
 }
