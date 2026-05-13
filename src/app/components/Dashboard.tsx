@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { AppLogo } from "./AppLogo";
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { Maximize2, X } from "lucide-react";
 
 const dayHeaders = ["D", "S", "T", "Q", "Q", "S", "S"];
 
@@ -71,11 +71,16 @@ export function Dashboard() {
   // Events for calendar
   const eventDays: Record<number, boolean> = { 17: true };
 
-  return (
-    <div className="flex-1 flex flex-col pb-24 overflow-auto">
-      {/* ─── Top Bar ─── */}
-      <div className="flex items-center justify-between px-6 pt-7 pb-2">
-        <AppLogo size={28} />
+  // ─── Shared sub-components ───
+
+  const TopBar = () => (
+    <>
+      <div className="flex items-center justify-between px-6 pt-7 pb-2 lg:px-8">
+        {/* Logo only on mobile */}
+        <div className="lg:hidden">
+          <AppLogo size={28} />
+        </div>
+        <div className="hidden lg:block" />
         <div className="flex items-center gap-2">
           <button
             onClick={() => setTab("pessoal")}
@@ -99,208 +104,259 @@ export function Dashboard() {
           </button>
         </div>
       </div>
+      <div className="mx-4 h-[1px] bg-[#222] mb-6 lg:mx-8" />
+    </>
+  );
 
-      {/* Separator */}
-      <div className="mx-4 h-[1px] bg-[#222] mb-6" />
+  const Greeting = () => (
+    <div className="px-7 mb-5 lg:px-0">
+      <h2 className="text-[16px] text-white lg:text-[20px]">Olá, Nome!</h2>
+      <p className="text-[14px] text-[#707070]">
+        você está na turma "Ciencias da Comp"
+      </p>
+    </div>
+  );
 
-      {/* ─── Greeting ─── */}
-      <div className="px-7 mb-5">
-        <h2 className="text-[16px] text-white">Olá, Nome!</h2>
-        <p className="text-[14px] text-[#707070]">
-          você está na turma "Ciencias da Comp"
-        </p>
+  const AddReminder = () => (
+    <div className="mb-5">
+      <div
+        className="flex items-center gap-3 h-[69px] rounded-[9px] px-5 cursor-pointer transition-all active:scale-[0.98] hover:border-[#3a3a3a]"
+        style={{
+          background: "rgba(40,40,40,0.41)",
+          border: "2px dashed #282828",
+        }}
+        onClick={() => setShowReminder(true)}
+      >
+        <span className="text-[38px] text-[#4c4c4c] leading-none">+</span>
+        <span className="text-[16px] text-[rgba(255,255,255,0.19)]">
+          Adicionar lembrete
+        </span>
       </div>
 
-      {/* ─── Add Reminder ─── */}
-      <div className="px-7 mb-5">
-        <div
-          className="flex items-center gap-3 h-[69px] rounded-[9px] px-5 cursor-pointer transition-all active:scale-[0.98]"
-          style={{
-            background: "rgba(40,40,40,0.41)",
-            border: "2px dashed #282828",
-          }}
-          onClick={() => setShowReminder(true)}
+      {/* Reminder Modal Inline */}
+      {showReminder && (
+        <div className="mt-3 rounded-[12px] p-4" style={{ background: "rgba(58,58,58,0.6)" }}>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-[14px] text-white">Nome lembrete</h4>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#7A8F6B] px-2 py-0.5 rounded bg-[rgba(122,143,107,0.15)]">Todos</span>
+              <button onClick={() => setShowReminder(false)} className="text-[#666] hover:text-white transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-full bg-[#8F6B8A] flex items-center justify-center">
+              <span className="text-[10px] text-white">LB</span>
+            </div>
+            <div>
+              <p className="text-[12px] text-white">Laís Bembo</p>
+              <p className="text-[10px] text-[#666]">18/03/26</p>
+            </div>
+            <p className="text-[13px] text-[#666] ml-2">descrição maior aqui</p>
+          </div>
+          <input
+            value={reminderText}
+            onChange={(e) => setReminderText(e.target.value)}
+            placeholder="Escrever lembrete..."
+            className="w-full bg-[#222] rounded-lg px-3 py-2 text-[12px] text-white placeholder-[#555] outline-none"
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  const Filters = () => (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[16px] text-white">Filtrando por</h3>
+        <button
+          className="text-[14px] text-[rgba(112,112,112,0.48)] hover:text-[#7A8F6B] transition-colors"
+          onClick={() => navigate("/tasks")}
         >
-          <span className="text-[38px] text-[#4c4c4c] leading-none">+</span>
-          <span className="text-[16px] text-[rgba(255,255,255,0.19)]">
-            Adicionar lembrete
-          </span>
-        </div>
-
-        {/* Reminder Modal Inline */}
-        {showReminder && (
-          <div className="mt-3 rounded-[12px] p-4" style={{ background: "rgba(58,58,58,0.6)" }}>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-[14px] text-white">Nome lembrete</h4>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-[#7A8F6B] px-2 py-0.5 rounded bg-[rgba(122,143,107,0.15)]">Todos</span>
-                <button onClick={() => setShowReminder(false)} className="text-[#666]">
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-[#8F6B8A] flex items-center justify-center">
-                <span className="text-[10px] text-white">LB</span>
-              </div>
-              <div>
-                <p className="text-[12px] text-white">Laís Bembo</p>
-                <p className="text-[10px] text-[#666]">18/03/26</p>
-              </div>
-              <p className="text-[13px] text-[#666] ml-2">descrição maior aqui</p>
-            </div>
-            <input
-              value={reminderText}
-              onChange={(e) => setReminderText(e.target.value)}
-              placeholder="Escrever lembrete..."
-              className="w-full bg-[#222] rounded-lg px-3 py-2 text-[12px] text-white placeholder-[#555] outline-none"
-            />
-          </div>
-        )}
+          ver mais...
+        </button>
       </div>
-
-      {/* Separator */}
-      <div className="mx-4 h-[1px] bg-[#222] mb-4" />
-
-      {/* ─── Filters ─── */}
-      <div className="px-7 mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[16px] text-white">Filtrando por</h3>
-          <button
-            className="text-[14px] text-[rgba(112,112,112,0.48)]"
-            onClick={() => navigate("/tasks")}
-          >
-            ver mais...
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShapeFilter(!shapeFilter)}
-            className="h-[33px] px-4 rounded-[5px] text-[14px] text-[#a1a0a0] flex items-center gap-2"
-            style={{ background: "#222" }}
-          >
-            Formas {shapeFilter && <span className="text-[#666]">x</span>}
-          </button>
-          <button
-            onClick={() => setColorFilter(!colorFilter)}
-            className="h-[33px] px-4 rounded-[5px] text-[14px] text-[#a1a0a0] flex items-center gap-2"
-            style={{ background: "#222" }}
-          >
-            Cores {colorFilter && <span className="text-[#666]">x</span>}
-          </button>
-          <div className="flex-1" />
-          <button
-            onClick={() => setCalView(calView === "month" ? "week" : "month")}
-            className="h-[25px] px-3 rounded-[3px] text-[12px] text-white flex items-center gap-1"
-            style={{ background: "#424C3B" }}
-          >
-            {calView === "month" ? "Expandir" : "Minimizar"}
-          </button>
-          <button className="text-[#666]">
-            <Maximize2 size={14} />
-          </button>
-        </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setShapeFilter(!shapeFilter)}
+          className="h-[33px] px-4 rounded-[5px] text-[14px] text-[#a1a0a0] flex items-center gap-2 hover:text-white transition-colors"
+          style={{ background: "#222" }}
+        >
+          Formas {shapeFilter && <span className="text-[#666]">x</span>}
+        </button>
+        <button
+          onClick={() => setColorFilter(!colorFilter)}
+          className="h-[33px] px-4 rounded-[5px] text-[14px] text-[#a1a0a0] flex items-center gap-2 hover:text-white transition-colors"
+          style={{ background: "#222" }}
+        >
+          Cores {colorFilter && <span className="text-[#666]">x</span>}
+        </button>
+        <div className="flex-1" />
+        <button
+          onClick={() => setCalView(calView === "month" ? "week" : "month")}
+          className="h-[25px] px-3 rounded-[3px] text-[12px] text-white flex items-center gap-1 hover:opacity-80 transition-opacity"
+          style={{ background: "#424C3B" }}
+        >
+          {calView === "month" ? "Expandir" : "Minimizar"}
+        </button>
+        <button className="text-[#666] hover:text-white transition-colors">
+          <Maximize2 size={14} />
+        </button>
       </div>
+    </div>
+  );
 
-      {/* ─── Calendar ─── */}
-      <div className="px-7 mb-4">
-        <h3 className="text-[16px] text-white mb-2">Março, 2026</h3>
+  const Calendar = () => (
+    <div className="mb-4">
+      <h3 className="text-[16px] text-white mb-2">Março, 2026</h3>
 
-        {/* Day headers */}
-        <div className="grid grid-cols-7 rounded-[4px] mb-1" style={{ background: "#222" }}>
-          {dayHeaders.map((d, i) => {
-            const isTuesday = i === 2;
-            return (
-              <div
-                key={i}
-                className="flex items-center justify-center h-[33px]"
-              >
-                {isTuesday ? (
-                  <div className="w-[21px] h-[20px] rounded-full bg-[#7A8F6B] flex items-center justify-center">
-                    <span className="text-[14px] text-[#1c1c1c]">{d}</span>
-                  </div>
-                ) : (
-                  <span className="text-[14px] text-[rgba(255,255,255,0.57)]">{d}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Day grid */}
-        <div className="rounded-[4px]" style={{ background: "#222" }}>
-          {rows.map((row, ri) => (
-            <div key={ri} className="grid grid-cols-7">
-              {row.map((day, ci) => {
-                if (day === undefined || day === null) {
-                  return <div key={ci} className="h-[38px]" />;
-                }
-                const isSelected = day === selectedDay;
-                const hasEvent = eventDays[day];
-                return (
-                  <button
-                    key={ci}
-                    onClick={() => setSelectedDay(day)}
-                    className="h-[38px] flex items-center justify-center relative"
-                  >
-                    {hasEvent && isSelected ? (
-                      <div className="w-[35px] h-[27px] flex items-center justify-center">
-                        {/* Green triangle marker like Figma */}
-                        <svg width="35" height="27" viewBox="0 0 35 27" fill="none">
-                          <path d="M17.5 0L35 27H0L17.5 0Z" fill="#7A8F6B" />
-                        </svg>
-                        <span className="absolute text-[13px] text-[#1c1c1c]">{day}</span>
-                      </div>
-                    ) : (
-                      <span className="text-[14px] text-[rgba(255,255,255,0.34)]">{day}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-
-          {/* + Tarefas button inside calendar */}
-          <div className="flex justify-end px-2 pb-2 pt-1">
-            <button
-              onClick={() => navigate("/tasks")}
-              className="h-[27px] px-4 rounded-[4px] bg-[#7A8F6B] flex items-center gap-1 active:scale-95 transition-transform"
-            >
-              <span className="text-[20px] text-white leading-none">+</span>
-              <span className="text-[13px] text-white">Tarefas</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Ultima Alteração (Last Change) ─── */}
-      <div className="px-7 mb-4">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-[27px] px-3 rounded-[3px] flex items-center" style={{ background: "rgba(114,114,114,0.19)" }}>
-            <span className="text-[13px] text-white">Ultima alteração</span>
-          </div>
-          <span className="text-[13px] text-[rgba(255,255,255,0.37)]">18/03 - 0:45</span>
-        </div>
-
-        {recentLogs.map((log, i) => (
-          <div key={i} className="flex items-center gap-3 h-[42px] rounded-[3px] px-3 mb-2" style={{ background: "#222" }}>
+      {/* Day headers */}
+      <div className="grid grid-cols-7 rounded-[4px] mb-1" style={{ background: "#222" }}>
+        {dayHeaders.map((d, i) => {
+          const isTuesday = i === 2;
+          return (
             <div
-              className="w-[28px] h-[25px] rounded-full flex items-center justify-center shrink-0"
-              style={{ background: log.color }}
+              key={i}
+              className="flex items-center justify-center h-[33px]"
             >
-              <span className="text-[11px] text-white">{log.initials}</span>
+              {isTuesday ? (
+                <div className="w-[21px] h-[20px] rounded-full bg-[#7A8F6B] flex items-center justify-center">
+                  <span className="text-[14px] text-[#1c1c1c]">{d}</span>
+                </div>
+              ) : (
+                <span className="text-[14px] text-[rgba(255,255,255,0.57)]">{d}</span>
+              )}
             </div>
-            <span className="text-[12px] text-white">{log.user}</span>
-            <span className="text-[13px] text-[rgba(255,255,255,0.37)]">
-              {log.action} {log.date} -
-            </span>
-            <span className="text-[13px] text-[rgba(255,255,255,0.37)]">{log.detail}</span>
-            <div className="flex-1" />
-            <svg width="14" height="10" viewBox="0 0 14 10" fill="none" className="shrink-0">
-              <path d="M14 0V10L0 7L14 0Z" fill="#666" fillOpacity="0.3" />
-            </svg>
+          );
+        })}
+      </div>
+
+      {/* Day grid */}
+      <div className="rounded-[4px]" style={{ background: "#222" }}>
+        {rows.map((row, ri) => (
+          <div key={ri} className="grid grid-cols-7">
+            {row.map((day, ci) => {
+              if (day === undefined || day === null) {
+                return <div key={ci} className="h-[38px]" />;
+              }
+              const isSelected = day === selectedDay;
+              const hasEvent = eventDays[day];
+              return (
+                <button
+                  key={ci}
+                  onClick={() => setSelectedDay(day)}
+                  className="h-[38px] flex items-center justify-center relative hover:bg-[rgba(255,255,255,0.04)] transition-colors rounded"
+                >
+                  {hasEvent && isSelected ? (
+                    <div className="w-[35px] h-[27px] flex items-center justify-center">
+                      {/* Green triangle marker like Figma */}
+                      <svg width="35" height="27" viewBox="0 0 35 27" fill="none">
+                        <path d="M17.5 0L35 27H0L17.5 0Z" fill="#7A8F6B" />
+                      </svg>
+                      <span className="absolute text-[13px] text-[#1c1c1c]">{day}</span>
+                    </div>
+                  ) : (
+                    <span className={`text-[14px] ${isSelected ? "text-white font-medium" : "text-[rgba(255,255,255,0.34)]"}`}>
+                      {day}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         ))}
+
+        {/* + Tarefas button inside calendar */}
+        <div className="flex justify-end px-2 pb-2 pt-1">
+          <button
+            onClick={() => navigate("/tasks")}
+            className="h-[27px] px-4 rounded-[4px] bg-[#7A8F6B] flex items-center gap-1 active:scale-95 hover:brightness-110 transition-all"
+          >
+            <span className="text-[20px] text-white leading-none">+</span>
+            <span className="text-[13px] text-white">Tarefas</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const LastChange = () => (
+    <div className="mb-4">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="h-[27px] px-3 rounded-[3px] flex items-center" style={{ background: "rgba(114,114,114,0.19)" }}>
+          <span className="text-[13px] text-white">Ultima alteração</span>
+        </div>
+        <span className="text-[13px] text-[rgba(255,255,255,0.37)]">18/03 - 0:45</span>
+      </div>
+
+      {recentLogs.map((log, i) => (
+        <div key={i} className="flex items-center gap-3 h-[42px] rounded-[3px] px-3 mb-2 hover:bg-[#292929] transition-colors" style={{ background: "#222" }}>
+          <div
+            className="w-[28px] h-[25px] rounded-full flex items-center justify-center shrink-0"
+            style={{ background: log.color }}
+          >
+            <span className="text-[11px] text-white">{log.initials}</span>
+          </div>
+          <span className="text-[12px] text-white">{log.user}</span>
+          <span className="text-[13px] text-[rgba(255,255,255,0.37)]">
+            {log.action} {log.date} -
+          </span>
+          <span className="text-[13px] text-[rgba(255,255,255,0.37)]">{log.detail}</span>
+          <div className="flex-1" />
+          <svg width="14" height="10" viewBox="0 0 14 10" fill="none" className="shrink-0">
+            <path d="M14 0V10L0 7L14 0Z" fill="#666" fillOpacity="0.3" />
+          </svg>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="flex-1 flex flex-col pb-24 lg:pb-8 overflow-auto">
+      <TopBar />
+
+      {/* ─── Content: Mobile = stacked, Desktop = 2-column grid ─── */}
+      <div className="px-7 lg:px-8">
+        <Greeting />
+
+        {/* Desktop: 2-column layout */}
+        <div className="lg:grid lg:grid-cols-[1fr_1fr] lg:gap-8 xl:grid-cols-[minmax(380px,1fr)_minmax(380px,1.2fr)] xl:gap-10">
+          {/* Left column: Reminder + Calendar */}
+          <div>
+            <AddReminder />
+            <div className="h-[1px] bg-[#222] mb-4 lg:hidden" />
+            <Filters />
+            <Calendar />
+          </div>
+
+          {/* Right column: Last Change + more space for future content */}
+          <div>
+            <div className="h-[1px] bg-[#222] mb-4 lg:hidden" />
+            <LastChange />
+
+            {/* Desktop: extra info card */}
+            <div className="hidden lg:block mt-4">
+              <div className="rounded-[12px] p-5" style={{ background: "rgba(58,58,58,0.25)" }}>
+                <h3 className="text-[15px] text-white mb-3">Resumo da Semana</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-[8px] p-3 text-center" style={{ background: "rgba(122,143,107,0.15)" }}>
+                    <span className="text-[22px] text-[#7A8F6B] font-medium block">3</span>
+                    <span className="text-[11px] text-[#666]">Tarefas</span>
+                  </div>
+                  <div className="rounded-[8px] p-3 text-center" style={{ background: "rgba(142,107,138,0.15)" }}>
+                    <span className="text-[22px] text-[#8F6B8A] font-medium block">1</span>
+                    <span className="text-[11px] text-[#666]">Provas</span>
+                  </div>
+                  <div className="rounded-[8px] p-3 text-center" style={{ background: "rgba(232,200,74,0.15)" }}>
+                    <span className="text-[22px] text-[#E8C84A] font-medium block">5</span>
+                    <span className="text-[11px] text-[#666]">Cards</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -37,7 +37,7 @@ export function Tasks() {
 
   const TaskItem = ({ task }: { task: Task }) => (
     <div
-      className="flex items-center gap-3 h-[48px] rounded-[8px] px-4 mb-2 transition-all active:scale-[0.98]"
+      className="flex items-center gap-3 h-[48px] rounded-[8px] px-4 mb-2 transition-all active:scale-[0.98] hover:brightness-110 cursor-pointer"
       style={{
         background: task.highlighted
           ? "rgba(122,143,107,0.25)"
@@ -61,11 +61,28 @@ export function Tasks() {
     </div>
   );
 
+  const TaskSection = ({ title, tasks }: { title: string; tasks: Task[] }) => (
+    <div className="mb-5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[16px] text-white">{title}</h3>
+        <button className="h-[26px] px-3 rounded-2xl border border-[#3a3a3a] bg-[rgba(58,58,58,0.35)] text-[11px] text-[rgba(255,255,255,0.6)] flex items-center gap-1 hover:border-[#7A8F6B] hover:text-white transition-all">
+          Adicionar <ChevronDown size={10} />
+        </button>
+      </div>
+      {tasks.map((t) => (
+        <TaskItem key={t.id} task={t} />
+      ))}
+    </div>
+  );
+
   return (
-    <div className="flex-1 flex flex-col pb-24 overflow-auto">
+    <div className="flex-1 flex flex-col pb-24 lg:pb-8 overflow-auto">
       {/* Top Bar */}
-      <div className="flex items-center justify-between px-6 pt-7 pb-2">
-        <AppLogo size={28} />
+      <div className="flex items-center justify-between px-6 pt-7 pb-2 lg:px-8">
+        <div className="lg:hidden">
+          <AppLogo size={28} />
+        </div>
+        <div className="hidden lg:block" />
         <div className="flex items-center gap-2">
           <button
             onClick={() => setTab("pessoal")}
@@ -89,26 +106,26 @@ export function Tasks() {
           </button>
         </div>
       </div>
-      <div className="mx-4 h-[1px] bg-[#222] mb-6" />
+      <div className="mx-4 h-[1px] bg-[#222] mb-6 lg:mx-8" />
 
       {/* Greeting */}
-      <div className="px-7 mb-5">
-        <h2 className="text-[16px] text-white">Olá, Nome!</h2>
+      <div className="px-7 mb-5 lg:px-8">
+        <h2 className="text-[16px] text-white lg:text-[20px]">Olá, Nome!</h2>
         <p className="text-[14px] text-[#707070]">
           você está em "Listas: Ciencias da Comp"
         </p>
       </div>
 
       {/* Week Selector */}
-      <div className="px-7 mb-6">
-        <div className="flex items-center gap-1">
+      <div className="px-7 mb-6 lg:px-8">
+        <div className="flex items-center gap-1 lg:max-w-[600px]">
           {weekDays.map((wd) => {
             const sel = wd.day === selectedDay;
             return (
               <button
                 key={wd.day}
                 onClick={() => setSelectedDay(wd.day)}
-                className="flex-1 flex flex-col items-center py-2 rounded-lg transition-all"
+                className="flex-1 flex flex-col items-center py-2 rounded-lg transition-all hover:bg-[rgba(255,255,255,0.04)]"
                 style={sel ? { background: "rgba(122,143,107,0.1)" } : undefined}
               >
                 <span className="text-[16px] text-[rgba(255,255,255,0.6)]">{wd.day}</span>
@@ -125,30 +142,10 @@ export function Tasks() {
         </div>
       </div>
 
-      {/* Morning Section */}
-      <div className="px-7 mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[16px] text-white">Manhã</h3>
-          <button className="h-[26px] px-3 rounded-2xl border border-[#3a3a3a] bg-[rgba(58,58,58,0.35)] text-[11px] text-[rgba(255,255,255,0.6)] flex items-center gap-1">
-            Adicionar <ChevronDown size={10} />
-          </button>
-        </div>
-        {morningTasks.map((t) => (
-          <TaskItem key={t.id} task={t} />
-        ))}
-      </div>
-
-      {/* Afternoon Section */}
-      <div className="px-7 mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[16px] text-white">Tarde</h3>
-          <button className="h-[26px] px-3 rounded-2xl border border-[#3a3a3a] bg-[rgba(58,58,58,0.35)] text-[11px] text-[rgba(255,255,255,0.6)] flex items-center gap-1">
-            Adicionar <ChevronDown size={10} />
-          </button>
-        </div>
-        {afternoonTasks.map((t) => (
-          <TaskItem key={t.id} task={t} />
-        ))}
+      {/* Tasks — Desktop: side by side, Mobile: stacked */}
+      <div className="px-7 lg:px-8 lg:grid lg:grid-cols-2 lg:gap-8">
+        <TaskSection title="Manhã" tasks={morningTasks} />
+        <TaskSection title="Tarde" tasks={afternoonTasks} />
       </div>
     </div>
   );

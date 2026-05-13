@@ -32,10 +32,13 @@ export function History() {
   const [tab, setTab] = useState<"geral" | "pessoal">("geral");
 
   return (
-    <div className="flex-1 flex flex-col pb-24 overflow-auto">
+    <div className="flex-1 flex flex-col pb-24 lg:pb-8 overflow-auto">
       {/* Top Bar */}
-      <div className="flex items-center justify-between px-6 pt-7 pb-2">
-        <AppLogo size={28} />
+      <div className="flex items-center justify-between px-6 pt-7 pb-2 lg:px-8">
+        <div className="lg:hidden">
+          <AppLogo size={28} />
+        </div>
+        <div className="hidden lg:block" />
         <div className="flex items-center gap-2">
           <button
             onClick={() => setTab("pessoal")}
@@ -59,18 +62,18 @@ export function History() {
           </button>
         </div>
       </div>
-      <div className="mx-4 h-[1px] bg-[#222] mb-6" />
+      <div className="mx-4 h-[1px] bg-[#222] mb-6 lg:mx-8" />
 
       {/* Greeting */}
-      <div className="px-7 mb-5">
-        <h2 className="text-[16px] text-white">Olá, Nome!</h2>
+      <div className="px-7 mb-5 lg:px-8">
+        <h2 className="text-[16px] text-white lg:text-[20px]">Olá, Nome!</h2>
         <p className="text-[14px] text-[#707070]">
           você está em "Notificações: Ciencias da Comp"
         </p>
       </div>
 
       {/* Header */}
-      <div className="px-7 mb-4">
+      <div className="px-7 mb-4 lg:px-8">
         <div className="flex items-center gap-3">
           <div className="h-[30px] px-4 rounded-[3px] flex items-center" style={{ background: "rgba(114,114,114,0.19)" }}>
             <span className="text-[14px] text-white">Ultimas alterações</span>
@@ -79,55 +82,58 @@ export function History() {
         </div>
       </div>
 
-      {/* Timeline */}
-      <div className="px-7 mb-6">
-        <div className="relative pl-6">
-          {/* Vertical line */}
-          <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-[#333]" />
+      {/* Desktop: Timeline + Mentions side by side */}
+      <div className="px-7 lg:px-8 lg:grid lg:grid-cols-[1.2fr_1fr] lg:gap-8">
+        {/* Timeline */}
+        <div className="mb-6">
+          <div className="relative pl-6">
+            {/* Vertical line */}
+            <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-[#333]" />
 
-          {logs.map((log, i) => (
-            <div key={i} className="relative flex items-center gap-3 mb-6">
-              {/* Dot on timeline */}
-              <div className="absolute -left-6 w-[22px] h-[22px] rounded-full border-2 border-[#333] bg-[#1E1E1E] flex items-center justify-center z-10">
-                <div className="w-2 h-2 rounded-full" style={{ background: log.color }} />
+            {logs.map((log, i) => (
+              <div key={i} className="relative flex items-center gap-3 mb-6 hover:bg-[rgba(255,255,255,0.02)] rounded-lg p-1 -ml-1 transition-colors">
+                {/* Dot on timeline */}
+                <div className="absolute -left-5 w-[22px] h-[22px] rounded-full border-2 border-[#333] bg-[#1E1E1E] flex items-center justify-center z-10">
+                  <div className="w-2 h-2 rounded-full" style={{ background: log.color }} />
+                </div>
+
+                {/* Avatar */}
+                <div
+                  className="w-[30px] h-[28px] rounded-full flex items-center justify-center shrink-0 ml-2"
+                  style={{ background: log.color }}
+                >
+                  <span className="text-[10px] text-white">{log.initials}</span>
+                </div>
+
+                {/* Content */}
+                <span className="text-[12px] text-white">{log.user}</span>
+                <span className="text-[12px] text-[rgba(255,255,255,0.37)]">
+                  {log.action} {log.date} - {log.detail}
+                </span>
               </div>
-
-              {/* Avatar */}
-              <div
-                className="w-[30px] h-[28px] rounded-full flex items-center justify-center shrink-0 ml-2"
-                style={{ background: log.color }}
-              >
-                <span className="text-[10px] text-white">{log.initials}</span>
-              </div>
-
-              {/* Content */}
-              <span className="text-[12px] text-white">{log.user}</span>
-              <span className="text-[12px] text-[rgba(255,255,255,0.37)]">
-                {log.action} {log.date} - {log.detail}
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Mentions Section */}
-      <div className="px-7 mb-4">
-        <div className="rounded-[8px] p-5" style={{ background: "rgba(58,58,58,0.25)" }}>
-          <h3 className="text-[16px] text-white mb-4">Menções</h3>
-          <div className="h-[1px] bg-[#333] mb-4" />
+        {/* Mentions Section */}
+        <div className="mb-4">
+          <div className="rounded-[8px] p-5" style={{ background: "rgba(58,58,58,0.25)" }}>
+            <h3 className="text-[16px] text-white mb-4">Menções</h3>
+            <div className="h-[1px] bg-[#333] mb-4" />
 
-          {mentions.map((m, i) => (
-            <div key={i} className="flex items-center gap-2 mb-4 last:mb-0">
-              <span
-                className="text-[12px] text-white px-3 py-1.5 rounded-lg"
-                style={{ background: "rgba(122,143,107,0.25)", border: "1px solid rgba(122,143,107,0.3)" }}
-              >
-                {m.user}
-              </span>
-              <span className="text-[12px] text-[rgba(255,255,255,0.5)]">{m.action}</span>
-              <span className="text-[12px] text-white">{m.target}</span>
-            </div>
-          ))}
+            {mentions.map((m, i) => (
+              <div key={i} className="flex items-center gap-2 mb-4 last:mb-0 flex-wrap">
+                <span
+                  className="text-[12px] text-white px-3 py-1.5 rounded-lg"
+                  style={{ background: "rgba(122,143,107,0.25)", border: "1px solid rgba(122,143,107,0.3)" }}
+                >
+                  {m.user}
+                </span>
+                <span className="text-[12px] text-[rgba(255,255,255,0.5)]">{m.action}</span>
+                <span className="text-[12px] text-white">{m.target}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

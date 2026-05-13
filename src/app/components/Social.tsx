@@ -46,10 +46,13 @@ export function Social() {
   };
 
   return (
-    <div className="flex-1 flex flex-col pb-24 overflow-hidden">
+    <div className="flex-1 flex flex-col pb-24 lg:pb-8 overflow-hidden">
       {/* Top */}
-      <div className="flex items-center justify-between px-6 pt-7 pb-2">
-        <AppLogo size={28} />
+      <div className="flex items-center justify-between px-6 pt-7 pb-2 lg:px-8">
+        <div className="lg:hidden">
+          <AppLogo size={28} />
+        </div>
+        <div className="hidden lg:block" />
         <div className="flex items-center gap-2">
           <button
             onClick={() => setChannel("class")}
@@ -73,14 +76,14 @@ export function Social() {
           </button>
         </div>
       </div>
-      <div className="mx-4 h-[1px] bg-[#222] mb-4" />
+      <div className="mx-4 h-[1px] bg-[#222] mb-4 lg:mx-8" />
 
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-auto px-7 space-y-3 mb-3">
+      {/* Messages — on desktop: constrained width for readability */}
+      <div ref={scrollRef} className="flex-1 overflow-auto px-7 space-y-3 mb-3 lg:px-8 lg:max-w-[800px]">
         {current.map((m) => (
           <div key={m.id} className={`flex ${m.self ? "justify-end" : "justify-start"}`}>
             <div
-              className="max-w-[80%] rounded-[12px] px-4 py-2.5"
+              className="max-w-[80%] lg:max-w-[60%] rounded-[12px] px-4 py-2.5 hover:brightness-110 transition-all"
               style={{
                 background: m.self ? "rgba(122,143,107,0.2)" : "rgba(42,42,42,0.6)",
                 borderBottomRightRadius: m.self ? "4px" : undefined,
@@ -100,16 +103,16 @@ export function Social() {
       </div>
 
       {/* Input */}
-      <div className="px-5 flex gap-2">
+      <div className="px-5 flex gap-2 lg:px-8 lg:max-w-[800px]">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           placeholder={channel === "class" ? "Mensagem para a turma..." : "Nova anotação..."}
-          className="flex-1 rounded-[12px] px-4 py-3 text-[13px] text-white placeholder-[#555] outline-none"
+          className="flex-1 rounded-[12px] px-4 py-3 text-[13px] text-white placeholder-[#555] outline-none focus:ring-1 focus:ring-[#7A8F6B] transition-all"
           style={{ background: "rgba(42,42,42,0.6)" }}
         />
-        <button onClick={send} className="w-11 h-11 rounded-[12px] bg-[#7A8F6B] flex items-center justify-center active:scale-95 transition-transform">
+        <button onClick={send} className="w-11 h-11 rounded-[12px] bg-[#7A8F6B] flex items-center justify-center active:scale-95 hover:brightness-110 transition-all">
           <Send size={15} className="text-white" />
         </button>
       </div>
