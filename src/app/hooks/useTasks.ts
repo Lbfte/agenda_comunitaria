@@ -32,7 +32,8 @@ export function useTasks(channel: 'geral' | 'pessoal') {
     if (!user) return;
 
     // Tentar cache primeiro se offline
-    const cacheKey = `tasks_${channel}_${JSON.stringify(filter || {})}`;
+    const filterKey = filter ? `p${filter.period || ''}_c${filter.completed ?? ''}_d${filter.date || ''}` : 'all';
+    const cacheKey = `tasks_${channel}_${filterKey}`;
     if (!isOnline) {
       const cached = getCacheData<Task[]>(cacheKey, 30 * 60 * 1000); // 30 min cache
       if (cached) {
@@ -98,31 +99,39 @@ export function useTasks(channel: 'geral' | 'pessoal') {
       created_by: user.id,
     };
 
+    const localTempId = crypto.randomUUID();
+    const optimistic: Task = {
+      id: localTempId,
+      title: input.title,
+      description: input.description || null,
+      type: taskData.type,
+      turma_id: taskData.turma_id || null,
+      created_by: user.id,
+      due_date: input.due_date || null,
+      due_time: input.due_time || null,
+      period: input.period || null,
+      shape: input.shape || 'triangle',
+      shape_color: input.shape_color || '#666',
+      completed: false,
+      completed_at: null,
+      google_calendar_event_id: null,
+      sync_status: isOnline ? 'pending' : 'local',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Adicionar à lista local imediatamente (verdadeiro optimistic update)
+    setTasks((prev) => [...prev, optimistic]);
+    setPendingCount(getQueueSize() + (isOnline ? 0 : 1));
+
     const result = await syncCreateTask(taskData, isOnline);
 
-    if (result.taskId) {
-      // Adicionar à lista local imediatamente (optimistic update)
-      const optimistic: Task = {
-        id: result.taskId,
-        title: input.title,
-        description: input.description || null,
-        type: taskData.type,
-        turma_id: taskData.turma_id || null,
-        created_by: user.id,
-        due_date: input.due_date || null,
-        due_time: input.due_time || null,
-        period: input.period || null,
-        shape: input.shape || 'triangle',
-        shape_color: input.shape_color || '#666',
-        completed: false,
-        completed_at: null,
-        google_calendar_event_id: null,
-        sync_status: result.syncStatus,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setTasks((prev) => [...prev, optimistic]);
+    if (result.success && result.taskId) {
+      setTasks((prev) => prev.map(t => t.id === localTempId ? { ...t, id: result.taskId!, sync_status: result.syncStatus } : t));
       setPendingCount(getQueueSize());
+    } else {
+      // rollback em caso de falha severa
+      setTasks((prev) => prev.filter(t => t.id !== localTempId));
     }
 
     return result;
@@ -138,23 +147,34 @@ export function useTasks(channel: 'geral' | 'pessoal') {
 
     const task = tasks.find((t) => t.id === taskId);
 
+    // Optimistic update imediato
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? { ...t, ...updates, sync_status: isOnline ? 'pending' : 'local' }
+          : t
+      )
+    );
+    setPendingCount(getQueueSize() + (isOnline ? 0 : 1));
+
     const result = await syncUpdateTask(
       taskId, updates, isOnline, user.id,
       task?.turma_id, task?.google_calendar_event_id
     );
 
-    // Optimistic update
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? { ...t, ...updates, sync_status: result.syncStatus }
-          : t
-      )
-    );
+    if (result.success) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, sync_status: result.syncStatus } : t
+        )
+      );
+    } else {
+      fetchTasks(); // rollback via refetch
+    }
     setPendingCount(getQueueSize());
 
     return result;
-  }, [user, tasks, isOnline]);
+  }, [user, tasks, isOnline, fetchTasks]);
 
   // ─── Complete ──────────────────────────────────────────────
 
@@ -163,23 +183,34 @@ export function useTasks(channel: 'geral' | 'pessoal') {
 
     const task = tasks.find((t) => t.id === taskId);
 
+    // Optimistic update imediato
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? { ...t, completed: true, completed_at: new Date().toISOString(), sync_status: isOnline ? 'pending' : 'local' }
+          : t
+      )
+    );
+    setPendingCount(getQueueSize() + (isOnline ? 0 : 1));
+
     const result = await syncCompleteTask(
       taskId, isOnline, user.id,
       task?.turma_id, task?.title
     );
 
-    // Optimistic update
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? { ...t, completed: true, completed_at: new Date().toISOString(), sync_status: result.syncStatus }
-          : t
-      )
-    );
+    if (result.success) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, sync_status: result.syncStatus } : t
+        )
+      );
+    } else {
+      fetchTasks(); // rollback via refetch
+    }
     setPendingCount(getQueueSize());
 
     return result;
-  }, [user, tasks, isOnline]);
+  }, [user, tasks, isOnline, fetchTasks]);
 
   // ─── Delete ────────────────────────────────────────────────
 
@@ -188,17 +219,22 @@ export function useTasks(channel: 'geral' | 'pessoal') {
 
     const task = tasks.find((t) => t.id === taskId);
 
+    // Optimistic: remover imediatamente
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setPendingCount(getQueueSize() + (isOnline ? 0 : 1));
+
     const result = await syncDeleteTask(
       taskId, isOnline, user.id,
       task?.turma_id, task?.google_calendar_event_id, task?.title
     );
 
-    // Optimistic: remover imediatamente
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    if (!result.success) {
+      fetchTasks(); // rollback
+    }
     setPendingCount(getQueueSize());
 
     return result;
-  }, [user, tasks, isOnline]);
+  }, [user, tasks, isOnline, fetchTasks]);
 
   // ─── Sync on reconnect ────────────────────────────────────
 

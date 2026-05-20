@@ -59,20 +59,21 @@ export async function syncCreateTask(
     return { success: false, syncStatus: 'local', error: error?.message, taskId: localId };
   }
 
-  // Tentar criar no Google Calendar (não-bloqueante)
+  // Tentar criar no Google Calendar (não-bloqueante de verdade)
   if (data.due_date) {
-    const gcalResult = await createCalendarEvent({
+    createCalendarEvent({
       title: data.title,
       date: data.due_date,
       time: data.due_time || undefined,
-    });
-
-    if (gcalResult?.id) {
-      await supabase
-        .from('tasks')
-        .update({ google_calendar_event_id: gcalResult.id })
-        .eq('id', data.id);
-    }
+    }).then(gcalResult => {
+      if (gcalResult?.id) {
+        supabase
+          .from('tasks')
+          .update({ google_calendar_event_id: gcalResult.id })
+          .eq('id', data.id)
+          .then(); // Ignorar promessa para não bloquear
+      }
+    }).catch(console.error);
   }
 
   // Registrar no histórico
@@ -258,26 +259,32 @@ async function processOperation(op: OfflineOperation): Promise<boolean> {
   switch (op.type) {
     case 'create': {
       const { id: _localId, ...taskData } = payload;
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('tasks')
-        .insert({ ...taskData, sync_status: 'synced' } as InsertDTO<'tasks'>);
+        .insert({ ...taskData, sync_status: 'synced' } as InsertDTO<'tasks'>)
+        .select('id, title, due_date, due_time')
+        .single();
 
-      if (error) {
-        console.error('Sync create falhou:', error.message);
+      if (error || !data) {
+        console.error('Sync create falhou:', error?.message);
         return false;
       }
 
-      // Tentar criar no Google Calendar
-      if (taskData.due_date && typeof taskData.title === 'string') {
-        const gcalResult = await createCalendarEvent({
-          title: taskData.title,
-          date: taskData.due_date as string,
-          time: (taskData.due_time as string) || undefined,
-        });
-        if (gcalResult?.id && taskData.id) {
-          // Impossível atualizar a task recém criada sem o ID retornado
-          // mas o evento foi criado no GCal — suficiente por ora
-        }
+      // Tentar criar no Google Calendar (non-blocking)
+      if (data.due_date) {
+        createCalendarEvent({
+          title: data.title,
+          date: data.due_date,
+          time: data.due_time || undefined,
+        }).then(gcalResult => {
+          if (gcalResult?.id) {
+            supabase
+              .from('tasks')
+              .update({ google_calendar_event_id: gcalResult.id })
+              .eq('id', data.id)
+              .then();
+          }
+        }).catch(console.error);
       }
       return true;
     }

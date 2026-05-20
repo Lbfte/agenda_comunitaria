@@ -47,13 +47,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Inicializar sessão e escutar mudanças
   useEffect(() => {
     // Buscar sessão existente
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error) {
+        console.error("Erro na validação de token:", error.message);
+        setState({ user: null, profile: null, session: null, loading: false });
+        return;
+      }
       if (session?.user) {
         const profile = await fetchProfile(session.user.id);
         setState({ user: session.user, profile, session, loading: false });
       } else {
         setState({ user: null, profile: null, session: null, loading: false });
       }
+    }).catch((err) => {
+      console.error("Erro fatal ao buscar sessão:", err);
+      setState({ user: null, profile: null, session: null, loading: false });
     });
 
     // Escutar mudanças de auth (login, logout, token refresh)
