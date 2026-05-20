@@ -1,141 +1,177 @@
 import { useState } from "react";
-import { AppLogo } from "./AppLogo";
+import { PageHeader } from "./PageHeader";
+import { useAuth } from "../contexts/AuthContext";
+import { useHistory } from "../hooks/useHistory";
 
-type LogEntry = {
-  user: string;
-  initials: string;
-  color: string;
-  action: string;
-  date: string;
-  detail: string;
+const actionLabels: Record<string, string> = {
+  add: "adicionou",
+  edit: "editou",
+  delete: "removeu",
+  complete: "concluiu",
 };
 
-const logs: LogEntry[] = [
-  { user: "Laís Bembo", initials: "LB", color: "#8F6B8A", action: "add em", date: "20/03", detail: "Prova" },
-  { user: "Albert William", initials: "AW", color: "#7A8F6B", action: "alt em", date: "20/03", detail: "Prova de..." },
-  { user: "Albert William", initials: "AW", color: "#7A8F6B", action: "add em", date: "27/03", detail: "Programaçã..." },
-  { user: "Laís Bembo", initials: "LB", color: "#8F6B8A", action: "del em", date: "21/03", detail: "evento n sei" },
-];
-
-type Mention = {
-  user: string;
-  action: string;
-  target: string;
+const actionColors: Record<string, string> = {
+  add: "#7A8F6B",
+  edit: "#5B8DEF",
+  delete: "#E85D5D",
+  complete: "#E8C84A",
 };
-
-const mentions: Mention[] = [
-  { user: "@Laís Bembo", action: "Marcou você em", target: '"Prova"' },
-  { user: "@Prof Renato", action: "Marcou todos em", target: '"entreg"...' },
-];
 
 export function History() {
   const [tab, setTab] = useState<"geral" | "pessoal">("geral");
+  const { profile } = useAuth();
+  const firstName = profile?.full_name?.split(" ")[0] || "Usuário";
+  const { entries, mentions, loading } = useHistory();
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  };
+
+  const formatTime = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const lastEntry = entries[0];
+  const lastDate = lastEntry
+    ? `${formatDate(lastEntry.created_at)} - ${formatTime(lastEntry.created_at)}`
+    : "--";
 
   return (
-    <div className="flex-1 flex flex-col pb-24 lg:pb-8 overflow-auto">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between px-6 pt-7 pb-2 lg:px-8">
-        <div className="lg:hidden">
-          <AppLogo size={28} />
-        </div>
-        <div className="hidden lg:block" />
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setTab("pessoal")}
-            className={`h-[33px] px-5 rounded-2xl text-[14px] transition-all border ${
-              tab === "pessoal"
-                ? "bg-[#7A8F6B] border-[#7A8F6B] text-white"
-                : "bg-[rgba(58,58,58,0.35)] border-[#3a3a3a] text-[rgba(255,255,255,0.14)]"
-            }`}
-          >
-            Pessoal
-          </button>
-          <button
-            onClick={() => setTab("geral")}
-            className={`h-[33px] px-5 rounded-2xl text-[14px] transition-all border ${
-              tab === "geral"
-                ? "bg-[#7A8F6B] border-[#7A8F6B] text-white"
-                : "bg-[rgba(58,58,58,0.35)] border-[#3a3a3a] text-white"
-            }`}
-          >
-            Geral
-          </button>
-        </div>
-      </div>
-      <div className="mx-4 h-[1px] bg-[#222] mb-6 lg:mx-8" />
+    <div className="flex-1 flex flex-col pb-24 md:pb-6 overflow-auto">
+      <PageHeader tab={tab} onTabChange={setTab} />
 
       {/* Greeting */}
-      <div className="px-7 mb-5 lg:px-8">
-        <h2 className="text-[16px] text-white lg:text-[20px]">Olá, Nome!</h2>
+      <div className="px-7 mb-5">
+        <h2 className="text-[16px] lg:text-[20px] text-white">Olá, {firstName}!</h2>
         <p className="text-[14px] text-[#707070]">
           você está em "Notificações: Ciencias da Comp"
         </p>
       </div>
 
       {/* Header */}
-      <div className="px-7 mb-4 lg:px-8">
+      <div className="px-7 mb-4">
         <div className="flex items-center gap-3">
-          <div className="h-[30px] px-4 rounded-[3px] flex items-center" style={{ background: "rgba(114,114,114,0.19)" }}>
-            <span className="text-[14px] text-white">Ultimas alterações</span>
+          <div
+            className="h-[30px] px-4 rounded-[3px] flex items-center"
+            style={{ background: "rgba(114,114,114,0.19)" }}
+          >
+            <span className="text-[14px] text-white">Últimas alterações</span>
           </div>
-          <span className="text-[13px] text-[rgba(255,255,255,0.37)]">18/03 - 0:45</span>
+          <span className="text-[13px] text-[rgba(255,255,255,0.37)]">{lastDate}</span>
         </div>
       </div>
 
-      {/* Desktop: Timeline + Mentions side by side */}
-      <div className="px-7 lg:px-8 lg:grid lg:grid-cols-[1.2fr_1fr] lg:gap-8">
-        {/* Timeline */}
-        <div className="mb-6">
-          <div className="relative pl-6">
-            {/* Vertical line */}
-            <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-[#333]" />
-
-            {logs.map((log, i) => (
-              <div key={i} className="relative flex items-center gap-3 mb-6 hover:bg-[rgba(255,255,255,0.02)] rounded-lg p-1 -ml-1 transition-colors">
-                {/* Dot on timeline */}
-                <div className="absolute -left-5 w-[22px] h-[22px] rounded-full border-2 border-[#333] bg-[#1E1E1E] flex items-center justify-center z-10">
-                  <div className="w-2 h-2 rounded-full" style={{ background: log.color }} />
-                </div>
-
-                {/* Avatar */}
-                <div
-                  className="w-[30px] h-[28px] rounded-full flex items-center justify-center shrink-0 ml-2"
-                  style={{ background: log.color }}
-                >
-                  <span className="text-[10px] text-white">{log.initials}</span>
-                </div>
-
-                {/* Content */}
-                <span className="text-[12px] text-white">{log.user}</span>
-                <span className="text-[12px] text-[rgba(255,255,255,0.37)]">
-                  {log.action} {log.date} - {log.detail}
-                </span>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-6 h-6 border-2 border-[#333] border-t-[#7A8F6B] rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:px-7">
+          {/* Timeline */}
+          <div className="px-7 lg:px-0 mb-6">
+            {entries.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-[14px] text-[#555]">Nenhuma alteração registrada ainda</p>
               </div>
-            ))}
+            ) : (
+              <div className="relative pl-6">
+                {/* Vertical line */}
+                <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-[#333]" />
+
+                {entries.map((entry) => {
+                  const color = entry.profile?.color || actionColors[entry.action] || "#666";
+                  return (
+                    <div key={entry.id} className="relative flex items-center gap-3 mb-6">
+                      {/* Dot */}
+                      <div className="absolute -left-6 w-[22px] h-[22px] rounded-full border-2 border-[#333] bg-[#1E1E1E] flex items-center justify-center z-10">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ background: actionColors[entry.action] || color }}
+                        />
+                      </div>
+
+                      {/* Avatar */}
+                      <div
+                        className="w-[30px] h-[28px] rounded-full flex items-center justify-center shrink-0 ml-2"
+                        style={{ background: color }}
+                      >
+                        <span className="text-[10px] text-white">
+                          {entry.profile?.initials || "?"}
+                        </span>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[12px] text-white">
+                            {entry.profile?.full_name || "Usuário"}
+                          </span>
+                          <span
+                            className="text-[11px] px-1.5 py-0.5 rounded"
+                            style={{
+                              color: actionColors[entry.action],
+                              background: `${actionColors[entry.action]}15`,
+                            }}
+                          >
+                            {actionLabels[entry.action] || entry.action}
+                          </span>
+                          <span className="text-[11px] text-[rgba(255,255,255,0.3)]">
+                            {entry.entity_type}
+                          </span>
+                        </div>
+                        {entry.description && (
+                          <p className="text-[12px] text-[rgba(255,255,255,0.37)] mt-0.5 truncate">
+                            {entry.description}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-[#444] mt-0.5">
+                          {formatDate(entry.created_at)} às {formatTime(entry.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Mentions Section */}
+          <div className="px-7 lg:px-0 mb-4">
+            <div className="rounded-[8px] p-5" style={{ background: "rgba(58,58,58,0.25)" }}>
+              <h3 className="text-[16px] text-white mb-4">Menções</h3>
+              <div className="h-[1px] bg-[#333] mb-4" />
+
+              {mentions.length === 0 ? (
+                <p className="text-[13px] text-[#555] text-center py-4">
+                  Nenhuma menção para você
+                </p>
+              ) : (
+                mentions.map((m) => (
+                  <div key={m.id} className="flex items-center gap-2 mb-4 last:mb-0 flex-wrap">
+                    <span
+                      className="text-[12px] text-white px-3 py-1.5 rounded-lg shrink-0"
+                      style={{
+                        background: "rgba(122,143,107,0.25)",
+                        border: "1px solid rgba(122,143,107,0.3)",
+                      }}
+                    >
+                      @{m.mentioner?.full_name || "Alguém"}
+                    </span>
+                    <span className="text-[12px] text-[rgba(255,255,255,0.5)]">
+                      {m.history?.action ? actionLabels[m.history.action] : "mencionou você em"}
+                    </span>
+                    <span className="text-[12px] text-white truncate">
+                      {m.history?.description || ""}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Mentions Section */}
-        <div className="mb-4">
-          <div className="rounded-[8px] p-5" style={{ background: "rgba(58,58,58,0.25)" }}>
-            <h3 className="text-[16px] text-white mb-4">Menções</h3>
-            <div className="h-[1px] bg-[#333] mb-4" />
-
-            {mentions.map((m, i) => (
-              <div key={i} className="flex items-center gap-2 mb-4 last:mb-0 flex-wrap">
-                <span
-                  className="text-[12px] text-white px-3 py-1.5 rounded-lg"
-                  style={{ background: "rgba(122,143,107,0.25)", border: "1px solid rgba(122,143,107,0.3)" }}
-                >
-                  {m.user}
-                </span>
-                <span className="text-[12px] text-[rgba(255,255,255,0.5)]">{m.action}</span>
-                <span className="text-[12px] text-white">{m.target}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

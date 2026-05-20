@@ -1,10 +1,34 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import App from "./app/App";
-import "./styles/index.css";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './app/App';
+import '@/styles/tailwind.css';
+import { requestNotificationPermission } from './lib/notifications';
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
+// ─── Render App ──────────────────────────────────────────────
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
     <App />
-  </StrictMode>
+  </React.StrictMode>
 );
+
+// ─── Register Service Worker ─────────────────────────────────
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      console.log('SW registrado:', registration.scope);
+    } catch (error) {
+      console.warn('SW falhou:', error);
+    }
+  });
+}
+
+// ─── Request Notification Permission (after 3s delay) ────────
+
+setTimeout(() => {
+  requestNotificationPermission().then((status) => {
+    console.log('Notificações:', status);
+  });
+}, 3000);

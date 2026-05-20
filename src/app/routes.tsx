@@ -5,8 +5,13 @@ import { Tasks } from "./components/Tasks";
 import { StudyHub } from "./components/StudyHub";
 import { Social } from "./components/Social";
 import { History } from "./components/History";
+import { AuthCallback } from "./components/AuthCallback";
 
 export const router = createBrowserRouter([
+  {
+    path: "/auth/callback",
+    Component: AuthCallback,
+  },
   {
     path: "/",
     Component: RootLayout,

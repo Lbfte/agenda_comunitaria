@@ -1,0 +1,233 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { useNetworkStatus } from './useNetworkStatus';
+import {
+  syncCreateTask,
+  syncUpdateTask,
+  syncCompleteTask,
+  syncDeleteTask,
+  processOfflineQueue,
+} from '@/lib/sync-engine';
+import { getQueueSize, getCacheData, setCacheData } from '@/lib/local-storage';
+import type { Task, InsertDTO, UpdateDTO } from '@/lib/database.types';
+
+type TaskFilter = {
+  period?: 'manha' | 'tarde' | 'noite' | null;
+  completed?: boolean;
+  date?: string;       // 'YYYY-MM-DD'
+  type?: 'turma' | 'pessoal';
+};
+
+export function useTasks(channel: 'geral' | 'pessoal') {
+  const { user } = useAuth();
+  const { isOnline } = useNetworkStatus();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(getQueueSize());
+
+  // ─── Fetch tasks ───────────────────────────────────────────
+
+  const fetchTasks = useCallback(async (filter?: TaskFilter) => {
+    if (!user) return;
+
+    // Tentar cache primeiro se offline
+    const cacheKey = `tasks_${channel}_${JSON.stringify(filter || {})}`;
+    if (!isOnline) {
+      const cached = getCacheData<Task[]>(cacheKey, 30 * 60 * 1000); // 30 min cache
+      if (cached) {
+        setTasks(cached);
+        setLoading(false);
+        return;
+      }
+    }
+
+    setLoading(true);
+
+    let query = supabase
+      .from('tasks')
+      .select('*')
+      .order('due_date', { ascending: true })
+      .order('due_time', { ascending: true, nullsFirst: false });
+
+    // Filtrar por canal
+    if (channel === 'pessoal') {
+      query = query.eq('type', 'pessoal').eq('created_by', user.id);
+    } else {
+      query = query.eq('type', 'turma');
+    }
+
+    // Filtros adicionais
+    if (filter?.period) {
+      query = query.eq('period', filter.period);
+    }
+    if (filter?.completed !== undefined) {
+      query = query.eq('completed', filter.completed);
+    }
+    if (filter?.date) {
+      query = query.eq('due_date', filter.date);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Erro ao buscar tarefas:', error.message);
+      // Fallback para cache
+      const cached = getCacheData<Task[]>(cacheKey);
+      if (cached) setTasks(cached);
+    } else {
+      setTasks(data || []);
+      setCacheData(cacheKey, data || []);
+    }
+
+    setLoading(false);
+  }, [user, channel, isOnline]);
+
+  // ─── Create ────────────────────────────────────────────────
+
+  const createTask = useCallback(async (
+    input: Pick<InsertDTO<'tasks'>, 'title' | 'description' | 'due_date' | 'due_time' | 'period' | 'shape' | 'shape_color'>,
+    turmaId?: string
+  ) => {
+    if (!user) return null;
+
+    const taskData: InsertDTO<'tasks'> = {
+      ...input,
+      type: channel === 'pessoal' ? 'pessoal' : 'turma',
+      turma_id: channel === 'geral' ? turmaId : undefined,
+      created_by: user.id,
+    };
+
+    const result = await syncCreateTask(taskData, isOnline);
+
+    if (result.taskId) {
+      // Adicionar à lista local imediatamente (optimistic update)
+      const optimistic: Task = {
+        id: result.taskId,
+        title: input.title,
+        description: input.description || null,
+        type: taskData.type,
+        turma_id: taskData.turma_id || null,
+        created_by: user.id,
+        due_date: input.due_date || null,
+        due_time: input.due_time || null,
+        period: input.period || null,
+        shape: input.shape || 'triangle',
+        shape_color: input.shape_color || '#666',
+        completed: false,
+        completed_at: null,
+        google_calendar_event_id: null,
+        sync_status: result.syncStatus,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setTasks((prev) => [...prev, optimistic]);
+      setPendingCount(getQueueSize());
+    }
+
+    return result;
+  }, [user, channel, isOnline]);
+
+  // ─── Update ────────────────────────────────────────────────
+
+  const updateTask = useCallback(async (
+    taskId: string,
+    updates: UpdateDTO<'tasks'>
+  ) => {
+    if (!user) return null;
+
+    const task = tasks.find((t) => t.id === taskId);
+
+    const result = await syncUpdateTask(
+      taskId, updates, isOnline, user.id,
+      task?.turma_id, task?.google_calendar_event_id
+    );
+
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? { ...t, ...updates, sync_status: result.syncStatus }
+          : t
+      )
+    );
+    setPendingCount(getQueueSize());
+
+    return result;
+  }, [user, tasks, isOnline]);
+
+  // ─── Complete ──────────────────────────────────────────────
+
+  const completeTask = useCallback(async (taskId: string) => {
+    if (!user) return null;
+
+    const task = tasks.find((t) => t.id === taskId);
+
+    const result = await syncCompleteTask(
+      taskId, isOnline, user.id,
+      task?.turma_id, task?.title
+    );
+
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? { ...t, completed: true, completed_at: new Date().toISOString(), sync_status: result.syncStatus }
+          : t
+      )
+    );
+    setPendingCount(getQueueSize());
+
+    return result;
+  }, [user, tasks, isOnline]);
+
+  // ─── Delete ────────────────────────────────────────────────
+
+  const deleteTask = useCallback(async (taskId: string) => {
+    if (!user) return null;
+
+    const task = tasks.find((t) => t.id === taskId);
+
+    const result = await syncDeleteTask(
+      taskId, isOnline, user.id,
+      task?.turma_id, task?.google_calendar_event_id, task?.title
+    );
+
+    // Optimistic: remover imediatamente
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setPendingCount(getQueueSize());
+
+    return result;
+  }, [user, tasks, isOnline]);
+
+  // ─── Sync on reconnect ────────────────────────────────────
+
+  useEffect(() => {
+    if (isOnline && getQueueSize() > 0) {
+      processOfflineQueue().then((count) => {
+        if (count > 0) {
+          setPendingCount(getQueueSize());
+          fetchTasks(); // Refresh após sync
+        }
+      });
+    }
+  }, [isOnline, fetchTasks]);
+
+  // ─── Initial fetch ────────────────────────────────────────
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  return {
+    tasks,
+    loading,
+    isOnline,
+    pendingCount,
+    fetchTasks,
+    createTask,
+    updateTask,
+    completeTask,
+    deleteTask,
+  };
+}
