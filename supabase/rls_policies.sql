@@ -48,9 +48,9 @@ create policy "profiles_update_own" on public.profiles
 -- ────────────────────────────────────────────────────────────
 -- TURMAS
 -- ────────────────────────────────────────────────────────────
--- Ler: apenas membros da turma
-create policy "turmas_select_members" on public.turmas
-  for select using (public.is_turma_member(id));
+-- Ler: qualquer pessoa (essencial para listar no cadastro e onboarding)
+create policy "turmas_select_public" on public.turmas
+  for select using (true);
 
 -- Criar: qualquer usuário autenticado
 create policy "turmas_insert_auth" on public.turmas
@@ -224,4 +224,35 @@ create policy "mentions_insert" on public.mentions
       select 1 from public.history h
       where h.id = history_id and h.user_id = auth.uid()
     )
+  );
+
+-- ────────────────────────────────────────────────────────────
+-- 10. TURMA_REQUESTS
+-- ────────────────────────────────────────────────────────────
+alter table public.turma_requests enable row level security;
+
+-- Ler: o próprio estudante ou o administrador
+create policy "turma_requests_select" on public.turma_requests
+  for select using (
+    user_id = auth.uid()
+    or auth.jwt() ->> 'email' = 'morcegosnaodormem@gmail.com'
+  );
+
+-- Inserir: estudante autenticado para si mesmo
+create policy "turma_requests_insert" on public.turma_requests
+  for insert with check (
+    user_id = auth.uid()
+  );
+
+-- Atualizar: apenas o administrador
+create policy "turma_requests_update" on public.turma_requests
+  for update using (
+    auth.jwt() ->> 'email' = 'morcegosnaodormem@gmail.com'
+  );
+
+-- Deletar: o próprio estudante ou o administrador
+create policy "turma_requests_delete" on public.turma_requests
+  for delete using (
+    user_id = auth.uid()
+    or auth.jwt() ->> 'email' = 'morcegosnaodormem@gmail.com'
   );

@@ -68,6 +68,26 @@ export function useFlashcards(channel: 'geral' | 'pessoal') {
     return data;
   }, [user, channel]);
 
+  const updateFolder = useCallback(async (
+    folderId: string,
+    updates: { name: string; letter: string; color: string }
+  ) => {
+    const { data, error } = await supabase
+      .from('flashcard_folders')
+      .update(updates)
+      .eq('id', folderId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao atualizar pasta:', error.message);
+      return null;
+    }
+
+    setFolders((prev) => prev.map((f) => f.id === folderId ? data : f));
+    return data;
+  }, []);
+
   const deleteFolder = useCallback(async (folderId: string) => {
     const { error } = await supabase
       .from('flashcard_folders')
@@ -197,6 +217,7 @@ export function useFlashcards(channel: 'geral' | 'pessoal') {
     loadingFolders,
     fetchFolders,
     createFolder,
+    updateFolder,
     deleteFolder,
     fetchCards,
     fetchDueCards,

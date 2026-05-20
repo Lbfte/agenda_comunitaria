@@ -17,6 +17,7 @@ export function StudyHub() {
     folders,
     loadingFolders,
     createFolder,
+    updateFolder,
     deleteFolder,
     fetchDueCards,
     fetchCards,
@@ -37,6 +38,7 @@ export function StudyHub() {
 
   // ─── Modal State ─────────────────────────────────────────
   const [showFolderModal, setShowFolderModal] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<{ id: string; name: string; letter: string; color: string } | null>(null);
   const [showEditModal, setShowEditModal] = useState<string | null>(null);
   const [editModalCards, setEditModalCards] = useState<Flashcard[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -353,6 +355,20 @@ export function StudyHub() {
                       ✏️ Editar cards
                     </button>
                     <button
+                      onClick={() => {
+                        setEditingFolder({
+                          id: folder.id,
+                          name: folder.name,
+                          letter: folder.letter || "",
+                          color: folder.color,
+                        });
+                        setContextMenu(null);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                    >
+                      ✏️ Editar pasta
+                    </button>
+                    <button
                       onClick={async () => { await deleteFolder(folder.id); setContextMenu(null); }}
                       className="block w-full text-left px-4 py-2 text-[12px] text-[#E85D5D] hover:bg-[rgba(232,93,93,0.1)]"
                     >
@@ -371,10 +387,25 @@ export function StudyHub() {
       {showFolderModal && (
         <FlashcardFolderModal
           onSubmit={async (data) => {
-            await createFolder(data);
+            await createFolder(data, tab === "geral" ? profile?.turma_id : undefined);
             setShowFolderModal(false);
           }}
           onClose={() => setShowFolderModal(false)}
+        />
+      )}
+
+      {editingFolder && (
+        <FlashcardFolderModal
+          editData={{
+            name: editingFolder.name,
+            letter: editingFolder.letter,
+            color: editingFolder.color,
+          }}
+          onSubmit={async (data) => {
+            await updateFolder(editingFolder.id, data);
+            setEditingFolder(null);
+          }}
+          onClose={() => setEditingFolder(null)}
         />
       )}
 

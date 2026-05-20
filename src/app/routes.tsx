@@ -6,6 +6,7 @@ import { StudyHub } from "./components/StudyHub";
 import { Social } from "./components/Social";
 import { History } from "./components/History";
 import { AuthCallback } from "./components/AuthCallback";
+import { AdminRequests } from "./components/AdminRequests";
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: "study", Component: StudyHub },
       { path: "social", Component: Social },
       { path: "history", Component: History },
+      { path: "admin/requests", Component: AdminRequests },
     ],
   },
 ]);

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { motion } from "motion/react";
+import { supabase } from "../../lib/supabase";
 
 export function LoginPage() {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, loading } = useAuth();
@@ -8,8 +9,32 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [turmas, setTurmas] = useState<{ id: string; name: string }[]>([]);
+  const [selectedTurmaId, setSelectedTurmaId] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    async function loadTurmas() {
+      try {
+        const { data, error } = await supabase
+          .from("turmas")
+          .select("id, name")
+          .order("name", { ascending: true });
+        if (error) {
+          console.error("Erro ao carregar turmas:", error);
+        } else if (data) {
+          setTurmas(data);
+          if (data.length > 0) {
+            setSelectedTurmaId(data[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Erro inesperado ao carregar turmas:", err);
+      }
+    }
+    loadTurmas();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,6 +47,9 @@ export function LoginPage() {
         setFormError("O nome é obrigatório para cadastro.");
         setIsSubmitting(false);
         return;
+      }
+      if (selectedTurmaId) {
+        localStorage.setItem("pending_turma_id", selectedTurmaId);
       }
       const res = await signUpWithEmail(email, password, fullName);
       error = res.error;
@@ -106,14 +134,35 @@ export function LoginPage() {
           className="w-full flex flex-col gap-4 mb-5"
         >
           {isSignUp && (
-            <input
-              type="text"
-              placeholder="Nome completo"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full h-[52px] rounded-2xl px-4 text-white placeholder-[#707070] outline-none transition-all focus:border-[#7A8F6B]"
-              style={{ background: "rgba(58,58,58,0.5)", border: "1px solid #3a3a3a" }}
-            />
+            <>
+              <input
+                type="text"
+                placeholder="Nome completo"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full h-[52px] rounded-2xl px-4 text-white placeholder-[#707070] outline-none transition-all focus:border-[#7A8F6B]"
+                style={{ background: "rgba(58,58,58,0.5)", border: "1px solid #3a3a3a" }}
+              />
+
+              {turmas.length > 0 && (
+                <div className="flex flex-col gap-1 w-full text-left">
+                  <span className="text-[12px] text-[#A0A0A0] pl-1 font-medium">Selecione sua Turma</span>
+                  <select
+                    value={selectedTurmaId}
+                    onChange={(e) => setSelectedTurmaId(e.target.value)}
+                    required
+                    className="w-full h-[52px] rounded-2xl px-4 text-white outline-none transition-all focus:border-[#7A8F6B] cursor-pointer"
+                    style={{ background: "rgba(58,58,58,0.5)", border: "1px solid #3a3a3a" }}
+                  >
+                    {turmas.map((t) => (
+                      <option key={t.id} value={t.id} style={{ background: "#1E1E1E", color: "white" }}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
           )}
           <input
             type="email"

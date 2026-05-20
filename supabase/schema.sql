@@ -193,3 +193,18 @@ create index idx_messages_turma     on public.messages(turma_id, channel, create
 create index idx_history_turma      on public.history(turma_id, created_at desc);
 create index idx_mentions_user      on public.mentions(mentioned_user_id);
 create index idx_turma_members_user on public.turma_members(user_id);
+
+-- ────────────────────────────────────────────────────────────
+-- 10. TURMA_REQUESTS (Solicitações para entrar na turma)
+-- ────────────────────────────────────────────────────────────
+create table public.turma_requests (
+  id            uuid primary key default uuid_generate_v4(),
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  turma_id      uuid not null references public.turmas(id) on delete cascade,
+  status        text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at    timestamptz default now(),
+  unique (user_id, turma_id)
+);
+
+create index idx_turma_requests_user on public.turma_requests(user_id);
+

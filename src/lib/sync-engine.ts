@@ -319,3 +319,71 @@ async function processOperation(op: OfflineOperation): Promise<boolean> {
       return false;
   }
 }
+
+/**
+ * Sincroniza em lote todas as tarefas ativas com o Google Calendar do usuário.
+ * 1. Processa operações pendentes da fila offline (sincronizando criações e deleções).
+ * 2. Identifica tarefas ativas no Supabase que não possuem ID do Google Calendar.
+ * 3. Envia cada uma para o calendário e atualiza o respectivo ID no Supabase.
+ */
+export async function syncAllWithGoogleCalendar(userId: string): Promise<{ success: boolean; syncedCount: number; error?: string }> {
+  try {
+    // 1. Processar qualquer pendência da fila offline antes de prosseguir
+    await processOfflineQueue();
+  } catch (e) {
+    console.error('Falha ao processar fila offline durante sincronização do Google Calendar:', e);
+  }
+
+  // 2. Buscar tarefas ativas com data
+  const { data: tasks, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('created_by', userId)
+    .eq('completed', false)
+    .not('due_date', 'is', null);
+
+  if (error) {
+    return { success: false, syncedCount: 0, error: error.message };
+  }
+
+  if (!tasks || tasks.length === 0) {
+    return { success: true, syncedCount: 0 };
+  }
+
+  // 3. Filtrar apenas as tarefas que ainda não estão integradas com o Google Calendar
+  const pendingTasks = tasks.filter(t => !t.google_calendar_event_id);
+
+  if (pendingTasks.length === 0) {
+    return { success: true, syncedCount: 0 };
+  }
+
+  let syncedCount = 0;
+
+  // 4. Criar cada evento pendente no Google Calendar
+  for (const task of pendingTasks) {
+    try {
+      const gcalResult = await createCalendarEvent({
+        title: task.title,
+        description: task.description || undefined,
+        date: task.due_date!,
+        time: task.due_time || undefined,
+      });
+
+      if (gcalResult?.id) {
+        const { error: updateError } = await supabase
+          .from('tasks')
+          .update({ google_calendar_event_id: gcalResult.id })
+          .eq('id', task.id);
+
+        if (!updateError) {
+          syncedCount++;
+        }
+      }
+    } catch (err) {
+      console.error(`Erro ao criar evento no Google Calendar para a tarefa ${task.id}:`, err);
+    }
+  }
+
+  return { success: true, syncedCount };
+}
+

@@ -1,7 +1,9 @@
-import { Home, Layers, FileText, Bell, MessageCircle, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Home, Layers, FileText, Bell, MessageCircle, LogOut, UserCheck } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
 import { AppLogo } from "./AppLogo";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
@@ -14,7 +16,26 @@ const navItems = [
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
+  const [turmaName, setTurmaName] = useState<string>("");
+
+  useEffect(() => {
+    if (profile?.turma_id) {
+      supabase
+        .from("turmas")
+        .select("name")
+        .eq("id", profile.turma_id)
+        .single()
+        .then(({ data }) => {
+          if (data) setTurmaName(data.name);
+        });
+    }
+  }, [profile?.turma_id]);
+
+  const items = [...navItems];
+  if (user?.email === "morcegosnaodormem@gmail.com") {
+    items.push({ icon: UserCheck, label: "Solicitações", path: "/admin/requests" });
+  }
 
   return (
     <aside className="hidden md:flex flex-col w-[72px] lg:w-[220px] min-h-screen bg-[#161616] border-r border-[rgba(255,255,255,0.06)] py-6 px-2 lg:px-4 shrink-0 transition-all duration-300">
@@ -28,7 +49,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex flex-col gap-1 flex-1">
-        {navItems.map((item) => {
+        {items.map((item) => {
           const active = location.pathname === item.path;
           return (
             <button
@@ -77,7 +98,9 @@ export function Sidebar() {
           </div>
           <div className="overflow-hidden">
             <p className="text-[13px] text-white truncate">{profile?.full_name || 'Usuário'}</p>
-            <p className="text-[11px] text-[#555] truncate">Ciencias da Comp</p>
+            <p className="text-[11px] text-[#555] truncate">
+              {user?.email === "morcegosnaodormem@gmail.com" ? "Administrador" : (turmaName || "Estudante")}
+            </p>
           </div>
         </div>
         {/* Collapsed avatar for tablet */}
