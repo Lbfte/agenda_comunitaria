@@ -3,7 +3,7 @@
 // Estratégia: Cache First para assets, Network First para API
 // ============================================================
 
-const CACHE_NAME = 'agenda-turma-v1';
+const CACHE_NAME = 'agenda-turma-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
