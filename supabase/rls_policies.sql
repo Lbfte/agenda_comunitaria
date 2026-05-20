@@ -76,10 +76,10 @@ create policy "turma_members_delete" on public.turma_members
   for delete using (
     user_id = auth.uid()
     or exists (
-      select 1 from public.turma_members
-      where turma_id = turma_members.turma_id
-        and user_id = auth.uid()
-        and role = 'admin'
+      select 1 from public.turma_members m
+      where m.turma_id = public.turma_members.turma_id
+        and m.user_id = auth.uid()
+        and m.role = 'admin'
     )
   );
 
