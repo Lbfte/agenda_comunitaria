@@ -39,13 +39,13 @@ export function AdminRequests() {
           turma_id,
           status,
           created_at,
-          profiles:user_id (
+          profiles!user_id (
             full_name,
             avatar_url,
             color,
             initials
           ),
-          turmas:turma_id (
+          turmas!turma_id (
             name
           )
         `)

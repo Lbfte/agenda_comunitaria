@@ -7,6 +7,7 @@ import { Social } from "./components/Social";
 import { History } from "./components/History";
 import { AuthCallback } from "./components/AuthCallback";
 import { AdminRequests } from "./components/AdminRequests";
+import { Turmas } from "./components/Turmas";
 
 export const router = createBrowserRouter([
   {
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { path: "social", Component: Social },
       { path: "history", Component: History },
       { path: "admin/requests", Component: AdminRequests },
+      { path: "turmas", Component: Turmas },
     ],
   },
 ]);

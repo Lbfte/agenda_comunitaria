@@ -115,7 +115,7 @@ export function Tasks() {
       period: (form.period as 'manha' | 'tarde' | 'noite') || undefined,
       shape: form.shape,
       shape_color: form.shape_color,
-    });
+    }, profile?.turma_id || undefined);
     setShowCreateModal(false);
   };
 

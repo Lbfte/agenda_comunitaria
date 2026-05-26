@@ -20,7 +20,7 @@ type TaskFilter = {
 };
 
 export function useTasks(channel: 'geral' | 'pessoal') {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { isOnline } = useNetworkStatus();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +56,12 @@ export function useTasks(channel: 'geral' | 'pessoal') {
       query = query.eq('type', 'pessoal').eq('created_by', user.id);
     } else {
       query = query.eq('type', 'turma');
+      if (profile?.turma_id) {
+        query = query.eq('turma_id', profile.turma_id);
+      } else if (user.email !== "morcegosnaodormem@gmail.com") {
+        // Usuário normal sem turma não vê tarefas de turma
+        query = query.eq('turma_id', '00000000-0000-0000-0000-000000000000');
+      }
     }
 
     // Filtros adicionais
@@ -82,7 +88,7 @@ export function useTasks(channel: 'geral' | 'pessoal') {
     }
 
     setLoading(false);
-  }, [user, channel, isOnline]);
+  }, [user, profile?.turma_id, channel, isOnline]);
 
   // ─── Create ────────────────────────────────────────────────
 

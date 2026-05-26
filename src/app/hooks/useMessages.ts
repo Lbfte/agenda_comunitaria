@@ -8,7 +8,7 @@ export interface MessageWithProfile extends Message {
   isSelf: boolean;
 }
 
-export function useMessages(channel: 'class' | 'private') {
+export function useMessages(channel: 'class' | 'private', turmaId?: string) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<MessageWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +50,13 @@ export function useMessages(channel: 'class' | 'private') {
 
     if (channel === 'private') {
       query = query.eq('user_id', user.id);
+    } else if (channel === 'class' && turmaId) {
+      query = query.eq('turma_id', turmaId);
+    } else if (channel === 'class' && !turmaId) {
+      // Se não houver turmaId em canal de turma, retorna vazio
+      setMessages([]);
+      setLoading(false);
+      return;
     }
 
     const { data, error } = await query;
@@ -63,12 +70,14 @@ export function useMessages(channel: 'class' | 'private') {
     const enriched = await enrichMessages(data || []);
     setMessages(enriched);
     setLoading(false);
-  }, [user, channel, enrichMessages]);
+  }, [user, channel, turmaId, enrichMessages]);
 
   // ─── Send Message ──────────────────────────────────────────
 
-  const sendMessage = useCallback(async (text: string, turmaId?: string) => {
+  const sendMessage = useCallback(async (text: string, customTurmaId?: string) => {
     if (!user || !text.trim()) return null;
+
+    const activeTurmaId = customTurmaId || turmaId;
 
     const { data, error } = await supabase
       .from('messages')
@@ -76,7 +85,7 @@ export function useMessages(channel: 'class' | 'private') {
         user_id: user.id,
         channel,
         text: text.trim(),
-        turma_id: channel === 'class' ? turmaId : undefined,
+        turma_id: channel === 'class' ? activeTurmaId : undefined,
       })
       .select()
       .single();
@@ -90,7 +99,7 @@ export function useMessages(channel: 'class' | 'private') {
     const enriched = await enrichMessages([data]);
     setMessages((prev) => [...prev, ...enriched]);
     return data;
-  }, [user, channel, enrichMessages]);
+  }, [user, channel, turmaId, enrichMessages]);
 
   // ─── Initial fetch ─────────────────────────────────────────
 
@@ -104,7 +113,7 @@ export function useMessages(channel: 'class' | 'private') {
     if (!user) return;
 
     const sub = supabase
-      .channel(`messages-${channel}`)
+      .channel(`messages-${channel}-${turmaId || 'all'}`)
       .on(
         'postgres_changes',
         {
@@ -117,6 +126,8 @@ export function useMessages(channel: 'class' | 'private') {
           const newMsg = payload.new as Message;
           // Não duplicar se já adicionamos optimisticamente
           if (newMsg.user_id === user.id) return;
+          // Filtrar mensagens da turma específica se estiver ativo o filtro
+          if (channel === 'class' && turmaId && newMsg.turma_id !== turmaId) return;
           const enriched = await enrichMessages([newMsg]);
           setMessages((prev) => [...prev, ...enriched]);
         }
@@ -126,7 +137,7 @@ export function useMessages(channel: 'class' | 'private') {
     return () => {
       supabase.removeChannel(sub);
     };
-  }, [user, channel, enrichMessages]);
+  }, [user, channel, turmaId, enrichMessages]);
 
   return {
     messages,

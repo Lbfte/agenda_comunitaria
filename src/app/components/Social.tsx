@@ -15,15 +15,39 @@ function getUserColor(name: string): string {
   return userColors[name];
 }
 
+import { supabase } from "@/lib/supabase";
+
 export function Social() {
   const [channel, setChannel] = useState<"class" | "private">("class");
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { profile } = useAuth();
-  const { messages, loading, sendMessage } = useMessages(channel);
+  const { user, profile } = useAuth();
+  const isAdmin = user?.email === "morcegosnaodormem@gmail.com";
+  
+  const [adminTurmas, setAdminTurmas] = useState<{ id: string; name: string }[]>([]);
+  const [selectedAdminTurmaId, setSelectedAdminTurmaId] = useState<string>("");
 
-  const hasNoTurma = channel === "class" && !profile?.turma_id;
+  useEffect(() => {
+    if (isAdmin && user) {
+      supabase
+        .from("turmas")
+        .select("id, name")
+        .eq("created_by", user.id)
+        .order("name", { ascending: true })
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setAdminTurmas(data);
+            setSelectedAdminTurmaId(data[0].id);
+          }
+        });
+    }
+  }, [isAdmin, user]);
+
+  const activeTurmaId = isAdmin ? selectedAdminTurmaId : profile?.turma_id;
+  const { messages, loading, sendMessage } = useMessages(channel, activeTurmaId);
+
+  const hasNoTurma = channel === "class" && !activeTurmaId;
 
   // Auto-scroll ao receber novas mensagens ou mudar de canal
   useEffect(() => {
@@ -35,7 +59,7 @@ export function Social() {
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    await sendMessage(input, channel === "class" ? profile?.turma_id : undefined);
+    await sendMessage(input, activeTurmaId);
     setInput("");
   };
 
@@ -87,21 +111,49 @@ export function Social() {
           </div>
         </div>
 
-        {/* Informativo de privacidade da aba */}
-        <div className="rounded-xl px-3.5 py-2 text-[11px] backdrop-blur-md flex items-center gap-2 border"
-          style={{
-            background: channel === "class" ? "rgba(91,141,239,0.03)" : "rgba(122,143,107,0.03)",
-            borderColor: channel === "class" ? "rgba(91,141,239,0.08)" : "rgba(122,143,107,0.08)",
-            color: channel === "class" ? "#8fb3f5" : "#acc59b",
-          }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: channel === "class" ? "#5B8DEF" : "#7A8F6B" }} />
-          <p className="leading-relaxed">
-            {channel === "class"
-              ? "Mensagens públicas. Elas são visíveis para qualquer colega que pertença à sua mesma turma."
-              : "Anotações pessoais. Tudo o que você escrever aqui fica guardado de forma totalmente privada e segura."}
-          </p>
-        </div>
+        {/* Informativo de privacidade da aba / Seletor do Admin */}
+        {isAdmin && channel === "class" && adminTurmas.length > 0 ? (
+          <div className="rounded-2xl p-4 text-[11px] backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 border bg-zinc-900/40 border-[#7A8F6B]/20">
+            <div>
+              <p className="text-[12px] font-semibold text-white flex items-center gap-1.5 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#7A8F6B]" />
+                Painel do Administrador Geral
+              </p>
+              <p className="text-[11px] text-zinc-500 font-light leading-relaxed">
+                Você não está associado a nenhuma turma pessoalmente, mas tem acesso a todos os chats das turmas que criou.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              <span className="text-[11px] text-zinc-400 font-medium">Chat Ativo:</span>
+              <select
+                value={selectedAdminTurmaId}
+                onChange={(e) => setSelectedAdminTurmaId(e.target.value)}
+                className="h-8 px-2.5 rounded-xl bg-zinc-950 border border-white/[0.06] hover:border-white/[0.1] text-[11px] text-zinc-300 font-medium focus:outline-none focus:border-[#7A8F6B]/40 cursor-pointer min-w-[140px]"
+              >
+                {adminTurmas.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl px-3.5 py-2 text-[11px] backdrop-blur-md flex items-center gap-2 border"
+            style={{
+              background: channel === "class" ? "rgba(91,141,239,0.03)" : "rgba(122,143,107,0.03)",
+              borderColor: channel === "class" ? "rgba(91,141,239,0.08)" : "rgba(122,143,107,0.08)",
+              color: channel === "class" ? "#8fb3f5" : "#acc59b",
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: channel === "class" ? "#5B8DEF" : "#7A8F6B" }} />
+            <p className="leading-relaxed">
+              {channel === "class"
+                ? "Mensagens públicas. Elas são visíveis para qualquer colega que pertença à sua mesma turma."
+                : "Anotações pessoais. Tudo o que você escrever aqui fica guardado de forma totalmente privada e segura."}
+            </p>
+          </div>
+        )}
       </div>
       <div className="mx-4 h-[1px] bg-[#222]/80 mb-3" />
 
@@ -117,9 +169,13 @@ export function Social() {
               <div className="w-[54px] h-[54px] rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 mb-1">
                 <AlertCircle size={24} />
               </div>
-              <h3 className="text-[14px] font-semibold text-white">Sem Turma Associada</h3>
+              <h3 className="text-[14px] font-semibold text-white">
+                {isAdmin ? "Nenhuma Turma Criada" : "Sem Turma Associada"}
+              </h3>
               <p className="text-[12px] text-[#666] leading-relaxed">
-                Você ainda não está associado a nenhuma turma. Por favor, acesse as configurações da sua conta ou solicite a associação a uma turma para participar do chat comunitário.
+                {isAdmin
+                  ? "Você entrou como Administrador Geral. Para interagir ou visualizar chats de turmas, primeiro crie uma turma na aba 'Turmas'."
+                  : "Você ainda não está associado a nenhuma turma. Por favor, acesse a aba 'Turmas' para escolher uma turma e solicitar ingresso."}
               </p>
             </div>
           ) : messages.length === 0 ? (

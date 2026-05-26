@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Home, Layers, FileText, Bell, MessageCircle, LogOut, UserCheck } from "lucide-react";
+import { Home, Layers, FileText, Bell, MessageCircle, LogOut, UserCheck, GraduationCap } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
 import { AppLogo } from "./AppLogo";
 import { useAuth } from "../contexts/AuthContext";
@@ -10,6 +10,7 @@ const navItems = [
   { icon: Layers, label: "Cards", path: "/study" },
   { icon: FileText, label: "Lista", path: "/tasks" },
   { icon: MessageCircle, label: "Social", path: "/social" },
+  { icon: GraduationCap, label: "Turmas", path: "/turmas" },
   { icon: Bell, label: "Alertas", path: "/history" },
 ];
 
