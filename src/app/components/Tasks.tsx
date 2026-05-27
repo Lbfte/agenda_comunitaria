@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useMemo, useEffect } from "react";
 import { PageHeader } from "./PageHeader";
 import {
@@ -11,6 +13,7 @@ import { SyncStatusBadge } from "./SyncStatusBadge";
 import { TaskCreateModal, type TaskFormData } from "./TaskCreateModal";
 import { syncAllWithGoogleCalendar } from "@/lib/sync-engine";
 import { motion, AnimatePresence } from "motion/react";
+import { KanbanBoard } from "./KanbanBoard";
 
 export function Tasks() {
   const [tab, setTab] = useState<"geral" | "pessoal">("geral");
@@ -23,7 +26,7 @@ export function Tasks() {
     useTasks(tab);
 
   // Novos Estados
-  const [viewMode, setViewMode] = useState<"lista" | "cards">("lista");
+  const [viewMode, setViewMode] = useState<"lista" | "cards" | "kanban">("lista");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"todos" | "provas" | "trabalhos" | "atividades" | "avisos">("todos");
   
@@ -105,9 +108,13 @@ export function Tasks() {
     return groups;
   }, [filteredTasks]);
 
-  // Criação de tarefa
   const handleCreate = async (form: TaskFormData) => {
-    await createTask({
+    if (tab === "geral" && !profile?.turma_id) {
+      alert("Você precisa entrar em uma turma para criar avisos na aba Geral!");
+      return;
+    }
+
+    const result = await createTask({
       title: form.title,
       description: form.description || undefined,
       due_date: form.due_date || undefined,
@@ -116,6 +123,11 @@ export function Tasks() {
       shape: form.shape,
       shape_color: form.shape_color,
     }, profile?.turma_id || undefined);
+
+    if (result && !result.success) {
+      alert("Erro ao salvar tarefa: " + (result.error || "Tente novamente."));
+    }
+
     setShowCreateModal(false);
   };
 
@@ -493,6 +505,15 @@ export function Tasks() {
               >
                 <Grid size={16} />
               </button>
+              <button
+                onClick={() => setViewMode("kanban")}
+                className={`h-8 w-10 flex items-center justify-center rounded-lg transition-all ${
+                  viewMode === "kanban" ? "bg-[#7A8F6B] text-zinc-950" : "text-zinc-500 hover:text-white"
+                }`}
+                title="Modo Kanban"
+              >
+                <SlidersHorizontal size={15} />
+              </button>
             </div>
           </div>
         </div>
@@ -505,6 +526,8 @@ export function Tasks() {
             <div className="w-8 h-8 border-2 border-zinc-800 border-t-[#7A8F6B] rounded-full animate-spin" />
             <span className="text-[13px] text-zinc-500 font-light">Carregando central de avisos...</span>
           </div>
+        ) : viewMode === "kanban" ? (
+          <KanbanBoard tasks={filteredTasks} onComplete={completeTask} onDelete={deleteTask} />
         ) : (
           <div className="space-y-1">
             {RenderGroupSection("⚠️ Atrasadas / Pendentes Anteriores", groupedTasks.atrasadas, "atrasadas")}
@@ -539,7 +562,13 @@ export function Tasks() {
 
         {/* FAB / Botão Flutuante (Nova Tarefa) */}
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => {
+            if (tab === "geral" && !profile?.turma_id) {
+              alert("Você precisa estar em uma turma para adicionar avisos gerais. Vá até a aba 'Turmas'!");
+              return;
+            }
+            setShowCreateModal(true);
+          }}
           className="fixed bottom-24 md:bottom-8 right-6 lg:right-8 w-14 h-14 rounded-full bg-gradient-to-r from-[#7A8F6B] to-[#9EBF8A] flex items-center justify-center shadow-2xl shadow-[#7A8F6B]/30 hover:scale-105 active:scale-95 transition-all z-40 cursor-pointer"
           title="Criar nova tarefa/aviso"
         >

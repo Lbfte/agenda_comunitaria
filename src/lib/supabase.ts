@@ -1,15 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
-    '⚠️ Variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY não configuradas.\n' +
+    '⚠️ Variáveis NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY não configuradas.\n' +
     'Crie um arquivo .env na raiz do projeto com:\n' +
-    '  VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co\n' +
-    '  VITE_SUPABASE_ANON_KEY=sua-anon-key'
+    '  NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJETO.supabase.co\n' +
+    '  NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-anon-key'
   );
 }
 

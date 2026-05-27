@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { PageHeader } from "./PageHeader";
 import { useAuth } from "../contexts/AuthContext";

@@ -70,6 +70,26 @@ export interface Database {
         };
       };
 
+      turma_requests: {
+        Row: {
+          id: string;
+          user_id: string;
+          turma_id: string;
+          status: 'pending' | 'approved' | 'rejected';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          turma_id: string;
+          status?: 'pending' | 'approved' | 'rejected';
+          created_at?: string;
+        };
+        Update: {
+          status?: 'pending' | 'approved' | 'rejected';
+        };
+      };
+
       tasks: {
         Row: {
           id: string;
@@ -273,3 +293,4 @@ export type Flashcard = Tables<'flashcards'>;
 export type Message = Tables<'messages'>;
 export type HistoryEntry = Tables<'history'>;
 export type Mention = Tables<'mentions'>;
+export type TurmaRequest = Tables<'turma_requests'>;

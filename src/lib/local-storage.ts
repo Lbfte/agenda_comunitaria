@@ -18,6 +18,7 @@ const CACHE_PREFIX = 'agenda_turma_cache_';
 // ─── Offline Queue ───────────────────────────────────────────
 
 export function getOfflineQueue(): OfflineOperation[] {
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(QUEUE_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -34,17 +35,22 @@ export function addToOfflineQueue(op: Omit<OfflineOperation, 'id' | 'timestamp'>
     timestamp: Date.now(),
   };
   queue.push(entry);
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  }
   return entry;
 }
 
 export function removeFromOfflineQueue(operationId: string): void {
+  if (typeof window === 'undefined') return;
   const queue = getOfflineQueue().filter((op) => op.id !== operationId);
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
 export function clearOfflineQueue(): void {
-  localStorage.setItem(QUEUE_KEY, JSON.stringify([]));
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify([]));
+  }
 }
 
 export function getQueueSize(): number {
@@ -54,6 +60,7 @@ export function getQueueSize(): number {
 // ─── Cache de dados locais ───────────────────────────────────
 
 export function setCacheData<T>(key: string, data: T): void {
+  if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({
       data,
@@ -65,6 +72,7 @@ export function setCacheData<T>(key: string, data: T): void {
 }
 
 export function getCacheData<T>(key: string, maxAgeMs = 5 * 60 * 1000): T | null {
+  if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(CACHE_PREFIX + key);
     if (!raw) return null;
@@ -77,6 +85,7 @@ export function getCacheData<T>(key: string, maxAgeMs = 5 * 60 * 1000): T | null
 }
 
 export function clearCache(): void {
+  if (typeof window === 'undefined') return;
   const keys = Object.keys(localStorage).filter((k) => k.startsWith(CACHE_PREFIX));
   keys.forEach((k) => localStorage.removeItem(k));
 }

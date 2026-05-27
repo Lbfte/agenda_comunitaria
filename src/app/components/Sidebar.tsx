@@ -1,6 +1,8 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { Home, Layers, FileText, Bell, MessageCircle, LogOut, UserCheck, GraduationCap } from "lucide-react";
-import { useNavigate, useLocation } from "react-router";
+import { useRouter, usePathname } from "next/navigation";
 import { AppLogo } from "./AppLogo";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -15,21 +17,21 @@ const navItems = [
 ];
 
 export function Sidebar() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
   const { user, profile, signOut } = useAuth();
   const [turmaName, setTurmaName] = useState<string>("");
 
   useEffect(() => {
     if (profile?.turma_id) {
       supabase
-        .from("turmas")
-        .select("name")
-        .eq("id", profile.turma_id)
-        .single()
-        .then(({ data }) => {
-          if (data) setTurmaName(data.name);
-        });
+          .from("turmas")
+          .select("name")
+          .eq("id", profile.turma_id)
+          .single()
+          .then(({ data }) => {
+            if (data) setTurmaName(data.name);
+          });
     }
   }, [profile?.turma_id]);
 
@@ -39,29 +41,29 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="hidden md:flex flex-col w-[72px] lg:w-[220px] min-h-screen bg-[#161616] border-r border-[rgba(255,255,255,0.06)] py-6 px-2 lg:px-4 shrink-0 transition-all duration-300">
-      {/* Logo */}
-      <div className="flex items-center gap-3 mb-10 px-2 lg:px-3">
-        <AppLogo size={32} />
-        <span className="hidden lg:block text-[15px] text-white font-medium tracking-tight">
+      <aside className="hidden md:flex flex-col w-[72px] lg:w-[220px] h-screen sticky top-0 overflow-hidden bg-[#161616] border-r border-[rgba(255,255,255,0.06)] py-6 px-2 lg:px-4 shrink-0 transition-all duration-300">
+        {/* Logo */}
+        <div className="flex items-center gap-3 mb-10 px-2 lg:px-3">
+          <AppLogo size={32} />
+          <span className="hidden lg:block text-[15px] text-white font-medium tracking-tight">
           Agenda da Turma
         </span>
-      </div>
+        </div>
 
-      {/* Navigation */}
-      <nav className="flex flex-col gap-1 flex-1">
-        {items.map((item) => {
-          const active = location.pathname === item.path;
-          return (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={`flex items-center gap-3 h-[44px] rounded-xl transition-all duration-200 px-3 lg:px-4 group relative ${
-                active
-                  ? "bg-[rgba(122,143,107,0.2)] text-white"
-                  : "text-[#666] hover:text-[#999] hover:bg-[rgba(255,255,255,0.04)]"
-              }`}
-            >
+        {/* Navigation */}
+        <nav className="flex flex-col gap-1 flex-1">
+          {items.map((item) => {
+            const active = pathname === item.path;
+            return (
+                <button
+                    key={item.path}
+                    onClick={() => router.push(item.path)}
+                    className={`flex items-center gap-3 h-[44px] rounded-xl transition-all duration-200 px-3 lg:px-4 group relative ${
+                        active
+                            ? "bg-[rgba(122,143,107,0.2)] text-white"
+                            : "text-[#666] hover:text-[#999] hover:bg-[rgba(255,255,255,0.04)]"
+                    }`}
+                >
               {/* Active indicator bar */}
               {active && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[24px] rounded-r-full bg-[#7A8F6B]" />

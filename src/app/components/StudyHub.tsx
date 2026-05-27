@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "./PageHeader";
 import { ChevronDown, X, MoreVertical, ArrowLeftRight, Trash2 } from "lucide-react";

@@ -1,4 +1,6 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+"use client";
+
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/database.types';
@@ -28,6 +30,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
   });
 
+  // Atualização inteligente do estado de auth para evitar novos objetos idênticos
+  const updateAuthState = useCallback((newState: Partial<AuthState>) => {
+    setState((prev) => {
+      let profile = prev.profile;
+      if ('profile' in newState) {
+        const nextProfile = newState.profile;
+        if (!nextProfile) {
+          profile = null;
+        } else if (
+          !prev.profile ||
+          prev.profile.id !== nextProfile.id ||
+          prev.profile.turma_id !== nextProfile.turma_id ||
+          prev.profile.full_name !== nextProfile.full_name ||
+          prev.profile.color !== nextProfile.color ||
+          prev.profile.initials !== nextProfile.initials
+        ) {
+          profile = nextProfile;
+        }
+      }
+
+      const user = 'user' in newState ? newState.user : prev.user;
+      const session = 'session' in newState ? newState.session : prev.session;
+      const loading = 'loading' in newState ? newState.loading : prev.loading;
+
+      if (
+        prev.user === user &&
+        prev.profile === profile &&
+        prev.session === session &&
+        prev.loading === loading
+      ) {
+        return prev;
+      }
+
+      return { user, profile, session, loading };
+    });
+  }, []);
+
   // Buscar perfil do usuário autenticado
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase
@@ -41,8 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!state.user) return;
     const profile = await fetchProfile(state.user.id);
-    setState((prev) => ({ ...prev, profile }));
-  }, [state.user, fetchProfile]);
+    updateAuthState({ profile });
+  }, [state.user, fetchProfile, updateAuthState]);
 
   // Inicializar sessão e escutar mudanças
   useEffect(() => {
@@ -50,18 +89,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error) {
         console.error("Erro na validação de token:", error.message);
-        setState({ user: null, profile: null, session: null, loading: false });
+        updateAuthState({ user: null, profile: null, session: null, loading: false });
         return;
       }
       if (session?.user) {
         const profile = await fetchProfile(session.user.id);
-        setState({ user: session.user, profile, session, loading: false });
+        updateAuthState({ user: session.user, profile, session, loading: false });
       } else {
-        setState({ user: null, profile: null, session: null, loading: false });
+        updateAuthState({ user: null, profile: null, session: null, loading: false });
       }
     }).catch((err) => {
       console.error("Erro fatal ao buscar sessão:", err);
-      setState({ user: null, profile: null, session: null, loading: false });
+      updateAuthState({ user: null, profile: null, session: null, loading: false });
     });
 
     // Escutar mudanças de auth (login, logout, token refresh)
@@ -69,15 +108,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
-          setState({ user: session.user, profile, session, loading: false });
+          updateAuthState({ user: session.user, profile, session, loading: false });
         } else {
-          setState({ user: null, profile: null, session: null, loading: false });
+          updateAuthState({ user: null, profile: null, session: null, loading: false });
         }
       }
     );
 
     return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+  }, [fetchProfile, updateAuthState]);
 
   // Login com Google OAuth
   const signInWithGoogle = useCallback(async () => {
@@ -120,11 +159,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Logout
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-    setState({ user: null, profile: null, session: null, loading: false });
-  }, []);
+    updateAuthState({ user: null, profile: null, session: null, loading: false });
+  }, [updateAuthState]);
+
+  const contextValue = useMemo(() => ({
+    ...state,
+    signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
+    signOut,
+    refreshProfile
+  }), [state, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, refreshProfile]);
 
   return (
-    <AuthContext.Provider value={{ ...state, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, refreshProfile }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,7 @@
+"use client";
+
 import { Home, Layers, FileText, Bell, MessageCircle, GraduationCap } from "lucide-react";
-import { useNavigate, useLocation } from "react-router";
+import { useRouter, usePathname } from "next/navigation";
 
 const mainItems = [
   { icon: Home, label: "Home", path: "/" },
@@ -10,10 +12,10 @@ const mainItems = [
 ];
 
 export function BottomNav() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const isNotification = location.pathname === "/history";
+  const isNotification = pathname === "/history";
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-4 pt-2 md:hidden">
@@ -24,11 +26,11 @@ export function BottomNav() {
           style={{ background: "#292929" }}
         >
           {mainItems.map((item) => {
-            const active = location.pathname === item.path;
+            const active = pathname === item.path;
             return (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
+                onClick={() => router.push(item.path)}
                 className={`flex items-center gap-1.5 h-[44px] rounded-[23px] transition-all duration-300 ${
                   active ? "px-4" : "px-2"
                 }`}
@@ -45,7 +47,7 @@ export function BottomNav() {
 
         {/* Notification bell - separate pill */}
         <button
-          onClick={() => navigate("/history")}
+          onClick={() => router.push("/history")}
           className="w-[54px] h-[58px] rounded-[23px] flex items-center justify-center relative transition-all shrink-0"
           style={{ background: isNotification ? "#7A8F6B" : "#292929" }}
         >

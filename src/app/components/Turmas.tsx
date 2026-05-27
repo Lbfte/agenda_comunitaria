@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
@@ -15,7 +17,7 @@ import {
   RefreshCw,
   Plus
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useRouter } from "next/navigation";
 
 type Turma = {
   id: string;
@@ -31,7 +33,7 @@ type TurmaRequest = {
 };
 
 export function Turmas() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const { user, profile, refreshProfile } = useAuth();
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [requests, setRequests] = useState<TurmaRequest[]>([]);
@@ -376,7 +378,7 @@ export function Turmas() {
       {/* Cabeçalho */}
       <div className="flex items-center gap-4 mb-8">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => router.push("/")}
           className="h-10 w-10 rounded-xl flex items-center justify-center border border-white/[0.04] bg-zinc-900/30 hover:bg-zinc-900/60 transition-colors cursor-pointer"
         >
           <ArrowLeft size={16} className="text-zinc-400" />

@@ -14,7 +14,25 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
   const [loading, setLoading] = useState(true);
   const profileCache = useRef(new Map<string, Pick<Profile, 'full_name' | 'initials' | 'color'>>());
 
+  const userRef = useRef(user);
+  const turmaIdRef = useRef(turmaId);
+  const activeFetchRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    userRef.current = user;
+    turmaIdRef.current = turmaId;
+  }, [user, turmaId]);
+
+  useEffect(() => {
+    return () => {
+      if (activeFetchRef.current) {
+        activeFetchRef.current.abort();
+      }
+    };
+  }, []);
+
   const enrichMessages = useCallback(async (msgs: Message[]): Promise<MessageWithProfile[]> => {
+    const currentUser = userRef.current;
     // Buscar perfis que ainda não estão no cache
     const missingIds = [...new Set(msgs.map((m) => m.user_id))]
       .filter((id) => !profileCache.current.has(id));
@@ -33,56 +51,90 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
     return msgs.map((m) => ({
       ...m,
       profile: profileCache.current.get(m.user_id) || null,
-      isSelf: m.user_id === user?.id,
+      isSelf: m.user_id === currentUser?.id,
     }));
-  }, [user]);
+  }, []);
 
   const fetchMessages = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
+    const currentUser = userRef.current;
+    if (!currentUser) return;
 
-    let query = supabase
-      .from('messages')
-      .select('*')
-      .eq('channel', channel)
-      .order('created_at', { ascending: true })
-      .limit(100);
+    const currentTurmaId = turmaIdRef.current;
+    const cacheKey = `messages_${channel}_${currentTurmaId || 'all'}_${currentUser.id}`;
 
-    if (channel === 'private') {
-      query = query.eq('user_id', user.id);
-    } else if (channel === 'class' && turmaId) {
-      query = query.eq('turma_id', turmaId);
-    } else if (channel === 'class' && !turmaId) {
-      // Se não houver turmaId em canal de turma, retorna vazio
-      setMessages([]);
-      setLoading(false);
-      return;
+    // SWR: Tentar usar cache local primeiro
+    const cachedStr = localStorage.getItem(cacheKey);
+    if (cachedStr) {
+      try {
+        const cached = JSON.parse(cachedStr);
+        setMessages(cached);
+        setLoading(false); // UI exibe as mensagens instantaneamente
+      } catch (e) {
+        console.error('Falha ao ler cache de mensagens', e);
+      }
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Erro ao buscar mensagens:', error.message);
-      setLoading(false);
-      return;
+    if (!cachedStr) {
+      setLoading(true);
     }
 
-    const enriched = await enrichMessages(data || []);
-    setMessages(enriched);
-    setLoading(false);
-  }, [user, channel, turmaId, enrichMessages]);
+    if (activeFetchRef.current) {
+      activeFetchRef.current.abort();
+    }
+    const controller = new AbortController();
+    activeFetchRef.current = controller;
+
+    try {
+      let query = supabase
+        .from('messages')
+        .select('*')
+        .eq('channel', channel)
+        .order('created_at', { ascending: true })
+        .limit(100);
+
+      if (channel === 'private') {
+        query = query.eq('user_id', currentUser.id);
+      } else if (channel === 'class' && currentTurmaId) {
+        query = query.eq('turma_id', currentTurmaId);
+      } else if (channel === 'class' && !currentTurmaId) {
+        // Se não houver turmaId em canal de turma, retorna vazio
+        setMessages([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await query.abortSignal(controller.signal);
+
+      if (error) {
+        console.error('Erro ao buscar mensagens:', error.message);
+      } else {
+        const enriched = await enrichMessages(data || []);
+        setMessages(enriched);
+        localStorage.setItem(cacheKey, JSON.stringify(enriched));
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      console.error('Erro inesperado ao buscar mensagens:', err);
+    } finally {
+      if (activeFetchRef.current === controller) {
+        activeFetchRef.current = null;
+        setLoading(false);
+      }
+    }
+  }, [channel, enrichMessages]);
 
   // ─── Send Message ──────────────────────────────────────────
 
   const sendMessage = useCallback(async (text: string, customTurmaId?: string) => {
-    if (!user || !text.trim()) return null;
+    const currentUser = userRef.current;
+    if (!currentUser || !text.trim()) return null;
 
-    const activeTurmaId = customTurmaId || turmaId;
+    const activeTurmaId = customTurmaId || turmaIdRef.current;
 
     const { data, error } = await supabase
       .from('messages')
       .insert({
-        user_id: user.id,
+        user_id: currentUser.id,
         channel,
         text: text.trim(),
         turma_id: channel === 'class' ? activeTurmaId : undefined,
@@ -99,7 +151,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
     const enriched = await enrichMessages([data]);
     setMessages((prev) => [...prev, ...enriched]);
     return data;
-  }, [user, channel, turmaId, enrichMessages]);
+  }, [channel, enrichMessages]);
 
   // ─── Initial fetch ─────────────────────────────────────────
 
@@ -110,10 +162,13 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
   // ─── Realtime subscription ─────────────────────────────────
 
   useEffect(() => {
-    if (!user) return;
+    const currentUser = userRef.current;
+    if (!currentUser) return;
+
+    const currentTurmaId = turmaIdRef.current;
 
     const sub = supabase
-      .channel(`messages-${channel}-${turmaId || 'all'}`)
+      .channel(`messages-${channel}-${currentTurmaId || 'all'}`)
       .on(
         'postgres_changes',
         {
@@ -125,9 +180,9 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
         async (payload) => {
           const newMsg = payload.new as Message;
           // Não duplicar se já adicionamos optimisticamente
-          if (newMsg.user_id === user.id) return;
+          if (newMsg.user_id === userRef.current?.id) return;
           // Filtrar mensagens da turma específica se estiver ativo o filtro
-          if (channel === 'class' && turmaId && newMsg.turma_id !== turmaId) return;
+          if (channel === 'class' && turmaIdRef.current && newMsg.turma_id !== turmaIdRef.current) return;
           const enriched = await enrichMessages([newMsg]);
           setMessages((prev) => [...prev, ...enriched]);
         }
@@ -137,7 +192,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
     return () => {
       supabase.removeChannel(sub);
     };
-  }, [user, channel, turmaId, enrichMessages]);
+  }, [channel, enrichMessages]);
 
   return {
     messages,

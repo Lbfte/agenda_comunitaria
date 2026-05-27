@@ -1,5 +1,6 @@
+"use client";
+
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router";
 import { PageHeader } from "./PageHeader";
 import { X, Calendar, RefreshCw, CheckCircle2, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -41,7 +42,6 @@ const recentLogs: LogEntry[] = [
 ];
 
 export function Dashboard() {
-  const navigate = useNavigate();
   const { user, profile, refreshProfile } = useAuth();
   const { isOnline } = useNetworkStatus();
   const firstName = profile?.full_name?.split(' ')[0] || 'Usuário';

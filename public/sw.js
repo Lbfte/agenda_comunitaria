@@ -3,10 +3,9 @@
 // Estratégia: Cache First para assets, Network First para API
 // ============================================================
 
-const CACHE_NAME = 'agenda-turma-v2';
+const CACHE_NAME = 'agenda-turma-v3';
 const STATIC_ASSETS = [
   '/',
-  '/index.html',
   '/manifest.json',
 ];
 
@@ -60,7 +59,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return response;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match('/'))
     );
     return;
   }

@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef, useEffect } from "react";
 import { Send, Hash, Lock, AlertCircle } from "lucide-react";
 import { useMessages } from "../hooks/useMessages";

@@ -1,5 +1,7 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, X, UserCheck, Clock, ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
@@ -22,7 +24,7 @@ type RequestWithDetails = {
 };
 
 export function AdminRequests() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [requests, setRequests] = useState<RequestWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -68,6 +70,22 @@ export function AdminRequests() {
 
   useEffect(() => {
     loadRequests();
+
+    // Iniciar escuta em tempo real para novas solicitações
+    const channel = supabase
+      .channel('admin-requests-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'turma_requests' },
+        () => {
+          loadRequests(); // Recarregar a lista quando houver nova solicitação
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleApprove = async (request: RequestWithDetails) => {
@@ -168,7 +186,7 @@ export function AdminRequests() {
       {/* Cabeçalho */}
       <div className="flex items-center gap-4 mb-8">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => router.push("/")}
           className="h-10 w-10 rounded-xl flex items-center justify-center border border-white/[0.04] bg-zinc-900/30 hover:bg-zinc-900/60 transition-colors cursor-pointer"
         >
           <ArrowLeft size={16} className="text-zinc-400" />

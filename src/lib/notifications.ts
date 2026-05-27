@@ -9,7 +9,7 @@ export type NotificationPermissionStatus = 'granted' | 'denied' | 'default' | 'u
  * Verifica se o browser suporta notificações.
  */
 export function isNotificationSupported(): boolean {
-  return 'Notification' in window;
+  return typeof window !== 'undefined' && 'Notification' in window;
 }
 
 /**
@@ -75,6 +75,7 @@ export function checkDeadlineAlerts(
     completed: boolean;
   }>
 ): void {
+  if (typeof window === 'undefined') return;
   if (getNotificationPermission() !== 'granted') return;
 
   const now = new Date();

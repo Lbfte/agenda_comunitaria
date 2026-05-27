@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -9,15 +9,41 @@ import {
 import type { FlashcardFolder, Flashcard, InsertDTO } from '@/lib/database.types';
 
 export function useFlashcards(channel: 'geral' | 'pessoal') {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [folders, setFolders] = useState<FlashcardFolder[]>([]);
   const [loadingFolders, setLoadingFolders] = useState(true);
+
+  const userRef = useRef(user);
+  const profileRef = useRef(profile);
+
+  useEffect(() => {
+    userRef.current = user;
+    profileRef.current = profile;
+  }, [user, profile]);
 
   // ─── Folders ───────────────────────────────────────────────
 
   const fetchFolders = useCallback(async () => {
-    if (!user) return;
-    setLoadingFolders(true);
+    const currentUser = userRef.current;
+    if (!currentUser) return;
+    
+    const currentProfile = profileRef.current;
+    const cacheKey = `flashcard_folders_${channel}_${currentUser.id}`;
+
+    const cachedStr = localStorage.getItem(cacheKey);
+    if (cachedStr) {
+      try {
+        const cached = JSON.parse(cachedStr);
+        setFolders(cached);
+        setLoadingFolders(false); // SWR: Renderiza UI imediatamente se tiver cache
+      } catch (e) {
+        console.error('Falha ao ler cache de flashcards', e);
+      }
+    }
+
+    if (!cachedStr) {
+      setLoadingFolders(true);
+    }
 
     let query = supabase
       .from('flashcard_folders')
@@ -25,16 +51,27 @@ export function useFlashcards(channel: 'geral' | 'pessoal') {
       .order('created_at', { ascending: false });
 
     if (channel === 'pessoal') {
-      query = query.eq('type', 'pessoal').eq('created_by', user.id);
+      query = query.eq('type', 'pessoal').eq('created_by', currentUser.id);
     } else {
       query = query.eq('type', 'turma');
+      if (currentProfile?.turma_id) {
+        query = query.eq('turma_id', currentProfile.turma_id);
+      } else if (currentUser.email !== "morcegosnaodormem@gmail.com") {
+        query = query.eq('turma_id', '00000000-0000-0000-0000-000000000000');
+      }
     }
 
     const { data, error } = await query;
-    if (error) console.error('Erro ao buscar pastas:', error.message);
-    setFolders(data || []);
+    if (error) {
+      console.error('Erro ao buscar pastas:', error.message);
+    } else {
+      const result = data || [];
+      setFolders(result);
+      localStorage.setItem(cacheKey, JSON.stringify(result));
+    }
+    
     setLoadingFolders(false);
-  }, [user, channel]);
+  }, [channel]);
 
   useEffect(() => {
     fetchFolders();

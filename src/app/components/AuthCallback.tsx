@@ -1,5 +1,7 @@
+"use client";
+
 import { useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 /**
@@ -8,7 +10,7 @@ import { supabase } from "@/lib/supabase";
  * Este componente extrai a sessão da URL e redireciona para o dashboard.
  */
 export function AuthCallback() {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -17,11 +19,11 @@ export function AuthCallback() {
         console.error("Erro ao processar callback OAuth:", error.message);
       }
       // Redireciona para a home independente — o AuthProvider já terá a sessão
-      navigate("/", { replace: true });
+      router.replace("/");
     };
 
     handleCallback();
-  }, [navigate]);
+  }, [router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "#1E1E1E" }}>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNetworkStatus } from './useNetworkStatus';
@@ -24,71 +24,107 @@ export function useTasks(channel: 'geral' | 'pessoal') {
   const { isOnline } = useNetworkStatus();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingCount, setPendingCount] = useState(getQueueSize());
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const userRef = useRef(user);
+  const profileRef = useRef(profile);
+  const isOnlineRef = useRef(isOnline);
+  const activeFetchRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    setPendingCount(getQueueSize());
+    userRef.current = user;
+    profileRef.current = profile;
+    isOnlineRef.current = isOnline;
+  }, [user, profile, isOnline]);
+
+  useEffect(() => {
+    return () => {
+      if (activeFetchRef.current) {
+        activeFetchRef.current.abort();
+      }
+    };
+  }, []);
 
   // ─── Fetch tasks ───────────────────────────────────────────
 
   const fetchTasks = useCallback(async (filter?: TaskFilter) => {
-    if (!user) return;
+    const currentUser = userRef.current;
+    if (!currentUser) return;
 
-    // Tentar cache primeiro se offline
+    const currentIsOnline = isOnlineRef.current;
+    const currentProfile = profileRef.current;
+
+    // Chave de cache
     const filterKey = filter ? `p${filter.period || ''}_c${filter.completed ?? ''}_d${filter.date || ''}` : 'all';
     const cacheKey = `tasks_${channel}_${filterKey}`;
-    if (!isOnline) {
-      const cached = getCacheData<Task[]>(cacheKey, 30 * 60 * 1000); // 30 min cache
-      if (cached) {
-        setTasks(cached);
+    
+    // SWR: Tentar cache primeiro para renderização imediata, mesmo online
+    const cached = getCacheData<Task[]>(cacheKey, 30 * 60 * 1000); // 30 min cache
+    if (cached) {
+      setTasks(cached);
+      setLoading(false);
+      if (!currentIsOnline) return; // Se offline e tem cache, encerra aqui
+    } else {
+      setLoading(true); // Só exibe spinner se não houver cache local
+    }
+
+    if (activeFetchRef.current) {
+      activeFetchRef.current.abort();
+    }
+    const controller = new AbortController();
+    activeFetchRef.current = controller;
+
+    try {
+      let query = supabase
+        .from('tasks')
+        .select('*')
+        .order('due_date', { ascending: true })
+        .order('due_time', { ascending: true, nullsFirst: false });
+
+      // Filtrar por canal
+      if (channel === 'pessoal') {
+        query = query.eq('type', 'pessoal').eq('created_by', currentUser.id);
+      } else {
+        query = query.eq('type', 'turma');
+        if (currentProfile?.turma_id) {
+          query = query.eq('turma_id', currentProfile.turma_id);
+        } else if (currentUser.email !== "morcegosnaodormem@gmail.com") {
+          // Usuário normal sem turma não vê tarefas de turma
+          query = query.eq('turma_id', '00000000-0000-0000-0000-000000000000');
+        }
+      }
+
+      // Filtros adicionais
+      if (filter?.period) {
+        query = query.eq('period', filter.period);
+      }
+      if (filter?.completed !== undefined) {
+        query = query.eq('completed', filter.completed);
+      }
+      if (filter?.date) {
+        query = query.eq('due_date', filter.date);
+      }
+
+      const { data, error } = await query.abortSignal(controller.signal);
+
+      if (error) {
+        if (error.message?.includes('AbortError')) return; // Silenciar cancelamento intencional
+        console.error('Erro ao buscar tarefas:', error.message);
+      } else {
+        setTasks(data || []);
+        setCacheData(cacheKey, data || []);
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      console.error('Erro inesperado ao buscar tarefas:', err);
+    } finally {
+      if (activeFetchRef.current === controller) {
+        activeFetchRef.current = null;
         setLoading(false);
-        return;
       }
     }
-
-    setLoading(true);
-
-    let query = supabase
-      .from('tasks')
-      .select('*')
-      .order('due_date', { ascending: true })
-      .order('due_time', { ascending: true, nullsFirst: false });
-
-    // Filtrar por canal
-    if (channel === 'pessoal') {
-      query = query.eq('type', 'pessoal').eq('created_by', user.id);
-    } else {
-      query = query.eq('type', 'turma');
-      if (profile?.turma_id) {
-        query = query.eq('turma_id', profile.turma_id);
-      } else if (user.email !== "morcegosnaodormem@gmail.com") {
-        // Usuário normal sem turma não vê tarefas de turma
-        query = query.eq('turma_id', '00000000-0000-0000-0000-000000000000');
-      }
-    }
-
-    // Filtros adicionais
-    if (filter?.period) {
-      query = query.eq('period', filter.period);
-    }
-    if (filter?.completed !== undefined) {
-      query = query.eq('completed', filter.completed);
-    }
-    if (filter?.date) {
-      query = query.eq('due_date', filter.date);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Erro ao buscar tarefas:', error.message);
-      // Fallback para cache
-      const cached = getCacheData<Task[]>(cacheKey);
-      if (cached) setTasks(cached);
-    } else {
-      setTasks(data || []);
-      setCacheData(cacheKey, data || []);
-    }
-
-    setLoading(false);
-  }, [user, profile?.turma_id, channel, isOnline]);
+  }, [channel]);
 
   // ─── Create ────────────────────────────────────────────────
 

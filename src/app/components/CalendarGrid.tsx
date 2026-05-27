@@ -1,4 +1,6 @@
-import { useNavigate } from "react-router";
+"use client";
+
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight, CalendarRange, Plus } from "lucide-react";
 import type { Task } from "@/lib/database.types";
@@ -27,7 +29,7 @@ export function CalendarGrid({
   onMonthChange,
   tasks
 }: CalendarGridProps) {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -176,7 +178,7 @@ export function CalendarGrid({
         {/* Botão de Rodapé + Tarefas */}
         <div className="flex justify-end mt-4 pt-3 border-t border-white/[0.04]">
           <button
-            onClick={() => navigate("/tasks")}
+            onClick={() => router.push("/tasks")}
             className="h-8 px-4 rounded-xl bg-gradient-to-r from-[#7A8F6B] to-[#9EBF8A] text-zinc-950 text-[13px] font-semibold flex items-center gap-1.5 active:scale-95 shadow-lg shadow-[#7A8F6B]/15 transition-transform"
           >
             <Plus size={14} strokeWidth={2.5} />
