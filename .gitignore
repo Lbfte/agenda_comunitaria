@@ -9,8 +9,6 @@ lerna-debug.log*
 
 # Node modules
 node_modules
-dist
-dist-ssr
 *.local
 
 # Editor directories and files
@@ -35,3 +33,7 @@ client_secret_*.json
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Next.js build output
+.next/
+out/
