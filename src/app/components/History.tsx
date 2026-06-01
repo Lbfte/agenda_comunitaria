@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "./PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { useHistory } from "../hooks/useHistory";
+import { RefreshCw, Calendar, ArrowRight, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { motion, AnimatePresence } from "motion/react";
+import { useRouter } from "next/navigation";
 
 const actionLabels: Record<string, string> = {
   add: "adicionou",
@@ -20,10 +24,77 @@ const actionColors: Record<string, string> = {
 };
 
 export function History() {
+  const router = useRouter();
+  const { profile, userTurmas, refreshProfile, user } = useAuth();
   const [viewTurmaId, setViewTurmaId] = useState<string>("all");
-  const { profile, userTurmas } = useAuth();
   const firstName = profile?.full_name?.split(" ")[0] || "Usuário";
   const { entries, mentions, loading } = useHistory(viewTurmaId);
+
+  // Estados para onboarding e solicitação pendente
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [activeRequest, setActiveRequest] = useState<any>(null);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+
+  // Buscar solicitação pendente
+  useEffect(() => {
+    if (!user || profile?.turma_id) return;
+    const userId = user.id;
+
+    async function checkPendingRequest() {
+      setOnboardingLoading(true);
+      setOnboardingError(null);
+      try {
+        const { data, error } = await supabase
+          .from("turma_requests")
+          .select("*, turmas(name)")
+          .eq("user_id", userId)
+          .eq("status", "pending")
+          .maybeSingle();
+
+        if (error) {
+          console.error("Erro ao buscar solicitações:", error);
+        } else {
+          setActiveRequest(data);
+        }
+      } catch (err) {
+        console.error("Erro inesperado no checkPendingRequest:", err);
+      } finally {
+        setOnboardingLoading(false);
+      }
+    }
+
+    checkPendingRequest();
+  }, [user, profile?.turma_id]);
+
+  const handleCheckStatus = async () => {
+    setOnboardingLoading(true);
+    await refreshProfile();
+    setOnboardingLoading(false);
+  };
+
+  const handleCancelRequest = async () => {
+    if (!activeRequest || !user) return;
+    setRequestSubmitting(true);
+    setOnboardingError(null);
+
+    try {
+      const { error } = await supabase
+        .from("turma_requests")
+        .delete()
+        .eq("id", activeRequest.id);
+
+      if (error) {
+        setOnboardingError(error.message);
+      } else {
+        setActiveRequest(null);
+      }
+    } catch (err: any) {
+      setOnboardingError(err.message || "Erro ao cancelar solicitação.");
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -61,6 +132,88 @@ export function History() {
           você está em "Notificações: {activeTurmaName}"
         </p>
       </div>
+
+      {/* Alerta de solicitação de turma ou falta de turma no topo */}
+      {!profile?.turma_id && user?.email !== "morcegosnaodormem@gmail.com" && (
+        <div className="px-7 mb-6">
+          <AnimatePresence mode="wait">
+            {onboardingLoading ? (
+              <div className="p-5 rounded-2xl border border-white/[0.06] bg-zinc-900/30 backdrop-blur-md flex items-center gap-3">
+                <RefreshCw size={16} className="animate-spin text-[#7A8F6B]" />
+                <span className="text-[13px] text-zinc-400">Verificando solicitações...</span>
+              </div>
+            ) : activeRequest ? (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="p-6 rounded-3xl border border-yellow-500/10 bg-yellow-500/[0.02] backdrop-blur-md shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shrink-0">
+                    <RefreshCw size={20} className="text-yellow-400 animate-pulse" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="text-[15px] font-semibold text-white">Solicitação de Entrada Pendente</h3>
+                    <p className="text-[13px] text-zinc-400 mt-1 leading-relaxed">
+                      Você enviou uma solicitação para a turma <strong className="text-yellow-400">{activeRequest.turmas?.name}</strong>. Ela está aguardando a aprovação do administrador.
+                    </p>
+                    {onboardingError && (
+                      <p className="text-[12px] text-red-400 mt-2 font-medium">{onboardingError}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={handleCheckStatus}
+                    disabled={requestSubmitting}
+                    className="h-10 px-4 rounded-xl flex items-center justify-center gap-2 text-zinc-950 bg-[#7A8F6B] hover:bg-[#8da77c] font-semibold text-[13px] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-lg shadow-[#7A8F6B]/10"
+                  >
+                    <RefreshCw size={12} className={requestSubmitting ? "animate-spin" : ""} />
+                    <span>Verificar Status</span>
+                  </button>
+
+                  <button
+                    onClick={handleCancelRequest}
+                    disabled={requestSubmitting}
+                    className="h-10 px-4 rounded-xl flex items-center justify-center border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-400 font-medium text-[13px] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  >
+                    <span>Cancelar</span>
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="p-6 rounded-3xl border border-white/[0.06] bg-zinc-900/60 backdrop-blur-md shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#7A8F6B]/15 flex items-center justify-center shrink-0">
+                    <Calendar size={20} className="text-[#9EBF8A]" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="text-[15px] font-semibold text-white">Nenhuma Turma Conectada</h3>
+                    <p className="text-[13px] text-zinc-400 mt-1 leading-relaxed">
+                      Para visualizar cronogramas de turmas, tarefas acadêmicas integradas e participar do chat social geral, você precisa estar em uma turma.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => router.push("/turmas")}
+                  className="h-11 px-5 rounded-xl flex items-center justify-center gap-2 text-zinc-950 bg-[#7A8F6B] hover:bg-[#8da77c] font-semibold text-[13px] transition-all active:scale-[0.98] cursor-pointer shadow-lg shadow-[#7A8F6B]/10 shrink-0"
+                >
+                  <span>Entrar em uma Turma</span>
+                  <ArrowRight size={14} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Header */}
       <div className="px-7 mb-4">

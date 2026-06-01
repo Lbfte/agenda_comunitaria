@@ -23,16 +23,17 @@ export function Dashboard() {
   const { user, profile, refreshProfile, userTurmas } = useAuth();
   const { isOnline } = useNetworkStatus();
   const firstName = profile?.full_name?.split(' ')[0] || 'Usuário';
-  const [tab, setTab] = useState<"geral" | "pessoal">("geral");
+  const [tab, setTab] = useState<"geral" | "pessoal">("pessoal");
   const [turmaName, setTurmaName] = useState<string>("");
 
-  // Estados para o fluxo de onboarding e solicitação de turma
-  const [onboardingLoading, setOnboardingLoading] = useState(true);
-  const [activeRequest, setActiveRequest] = useState<any>(null);
-  const [availableTurmas, setAvailableTurmas] = useState<{ id: string; name: string }[]>([]);
-  const [selectedOnboardingTurmaId, setSelectedOnboardingTurmaId] = useState("");
-  const [requestSubmitting, setRequestSubmitting] = useState(false);
-  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  // Inicializar aba baseada na presença de turma
+  useEffect(() => {
+    if (profile?.turma_id) {
+      setTab("geral");
+    } else {
+      setTab("pessoal");
+    }
+  }, [profile?.turma_id]);
 
   // Carregar nome da turma dinamicamente
   useEffect(() => {
@@ -48,144 +49,6 @@ export function Dashboard() {
     }
   }, [profile?.turma_id]);
 
-  // Gerenciar o fluxo de onboarding e solicitações de turma
-  useEffect(() => {
-    if (!user) return;
-
-    async function checkOnboarding(currentUser: NonNullable<typeof user>) {
-      setOnboardingLoading(true);
-      setOnboardingError(null);
-
-      try {
-        if (profile?.turma_id) {
-          setOnboardingLoading(false);
-          return;
-        }
-
-        const pendingTurmaId = localStorage.getItem("pending_turma_id");
-        if (pendingTurmaId) {
-          const { error: insertError } = await supabase
-            .from("turma_requests")
-            .insert({
-              user_id: currentUser.id,
-              turma_id: pendingTurmaId,
-              status: "pending"
-            } as any);
-
-          if (insertError) {
-            console.error("Erro ao inserir solicitação automática:", insertError);
-          }
-          localStorage.removeItem("pending_turma_id");
-        }
-
-        const { data: requestData, error: requestError } = await supabase
-          .from("turma_requests")
-          .select("*, turmas(name)")
-          .eq("user_id", currentUser.id)
-          .eq("status", "pending")
-          .maybeSingle();
-
-        if (requestError) {
-          console.error("Erro ao buscar solicitações:", requestError);
-        } else if (requestData) {
-          setActiveRequest(requestData);
-        } else {
-          setActiveRequest(null);
-          const { data: turmasData, error: turmasError } = await supabase
-            .from("turmas")
-            .select("id, name")
-            .order("name", { ascending: true });
-
-          if (turmasError) {
-            console.error("Erro ao carregar turmas:", turmasError);
-          } else if (turmasData) {
-            setAvailableTurmas(turmasData);
-            if (turmasData.length > 0) {
-              setSelectedOnboardingTurmaId((turmasData[0] as any).id);
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Erro inesperado no onboarding:", err);
-      } finally {
-        setOnboardingLoading(false);
-      }
-    }
-
-    checkOnboarding(user);
-  }, [user, profile?.turma_id]);
-
-  const handleSendRequest = async () => {
-    if (!user || !selectedOnboardingTurmaId) return;
-    setRequestSubmitting(true);
-    setOnboardingError(null);
-
-    try {
-      const { data, error } = await supabase
-        .from("turma_requests")
-        .insert({
-          user_id: user.id,
-          turma_id: selectedOnboardingTurmaId,
-          status: "pending"
-        } as any)
-        .select("*, turmas(name)")
-        .single();
-
-      if (error) {
-        if (error.message.includes("duplicate key")) {
-          setOnboardingError("Você já tem uma solicitação pendente para esta turma.");
-        } else {
-          setOnboardingError(error.message);
-        }
-      } else {
-        setActiveRequest(data);
-      }
-    } catch (err: any) {
-      setOnboardingError(err.message || "Erro ao enviar solicitação.");
-    } finally {
-      setRequestSubmitting(false);
-    }
-  };
-
-  const handleCancelRequest = async () => {
-    if (!activeRequest || !user) return;
-    setRequestSubmitting(true);
-    setOnboardingError(null);
-
-    try {
-      const { error } = await supabase
-        .from("turma_requests")
-        .delete()
-        .eq("id", activeRequest.id);
-
-      if (error) {
-        setOnboardingError(error.message);
-      } else {
-        setActiveRequest(null);
-        const { data: turmasData } = await supabase
-          .from("turmas")
-          .select("id, name")
-          .order("name", { ascending: true });
-        if (turmasData) {
-          setAvailableTurmas(turmasData);
-          if (turmasData.length > 0) {
-            setSelectedOnboardingTurmaId((turmasData[0] as any).id);
-          }
-        }
-      }
-    } catch (err: any) {
-      setOnboardingError(err.message || "Erro ao cancelar solicitação.");
-    } finally {
-      setRequestSubmitting(false);
-    }
-  };
-
-  const handleCheckStatus = async () => {
-    setOnboardingLoading(true);
-    await refreshProfile();
-    setOnboardingLoading(false);
-  };
-  
   // Data inicial dinâmica baseada na data atual real
   const today = new Date();
   const [month, setMonth] = useState(today.getMonth());
@@ -290,121 +153,11 @@ export function Dashboard() {
     }
   };
 
-  if (!profile?.turma_id && user?.email !== "morcegosnaodormem@gmail.com") {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 min-h-[80vh]">
-        {onboardingLoading ? (
-          <div className="flex flex-col items-center gap-3">
-            <RefreshCw size={24} className="animate-spin text-[#7A8F6B]" />
-            <span className="text-[14px] text-zinc-400">Verificando sua turma...</span>
-          </div>
-        ) : activeRequest ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-[420px] p-8 rounded-3xl border border-white/[0.06] bg-zinc-900/60 backdrop-blur-md shadow-2xl flex flex-col items-center text-center"
-          >
-            <div className="w-16 h-16 rounded-full bg-[#7A8F6B]/15 flex items-center justify-center mb-6">
-              <RefreshCw size={28} className="text-[#9EBF8A] animate-pulse" />
-            </div>
-            
-            <h3 className="text-[20px] font-semibold text-white mb-2">Solicitação Enviada!</h3>
-            
-            <p className="text-[14px] text-zinc-400 mb-6 leading-relaxed">
-              Sua solicitação de entrada na turma <strong className="text-[#9EBF8A]">{activeRequest.turmas?.name}</strong> foi enviada e está aguardando a aprovação do administrador.
-            </p>
-
-            <div className="flex flex-col gap-3 w-full">
-              <button
-                onClick={handleCheckStatus}
-                disabled={requestSubmitting}
-                className="w-full h-[48px] rounded-xl flex items-center justify-center gap-2 text-zinc-950 bg-[#7A8F6B] hover:bg-[#8da77c] font-semibold text-[14px] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-lg shadow-[#7A8F6B]/10"
-              >
-                <RefreshCw size={14} className={requestSubmitting ? "animate-spin" : ""} />
-                <span>Atualizar Status</span>
-              </button>
-
-              <button
-                onClick={handleCancelRequest}
-                disabled={requestSubmitting}
-                className="w-full h-[48px] rounded-xl flex items-center justify-center border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-400 font-medium text-[14px] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-              >
-                <span>Cancelar Solicitação</span>
-              </button>
-            </div>
-
-            {onboardingError && (
-              <p className="text-[12px] text-red-400 mt-4">{onboardingError}</p>
-            )}
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-[420px] p-8 rounded-3xl border border-white/[0.06] bg-zinc-900/60 backdrop-blur-md shadow-2xl flex flex-col items-center"
-          >
-            <div className="w-16 h-16 rounded-full bg-[#7A8F6B]/15 flex items-center justify-center mb-6">
-              <Calendar size={28} className="text-[#9EBF8A]" />
-            </div>
-
-            <h3 className="text-[20px] font-semibold text-white mb-2 text-center">Entre em uma Turma</h3>
-            
-            <p className="text-[14px] text-zinc-400 mb-6 text-center leading-relaxed">
-              Você ainda não está associado a nenhuma turma. Escolha sua turma abaixo para solicitar acesso ao calendário e materiais acadêmicos.
-            </p>
-
-            {availableTurmas.length > 0 ? (
-              <div className="flex flex-col gap-4 w-full">
-                <div className="flex flex-col gap-1.5 w-full text-left">
-                  <span className="text-[12px] text-[#A0A0A0] pl-1 font-medium">Turma Acadêmica</span>
-                  <select
-                    value={selectedOnboardingTurmaId}
-                    onChange={(e) => setSelectedOnboardingTurmaId(e.target.value)}
-                    className="w-full h-[52px] rounded-xl px-4 text-white outline-none transition-all focus:border-[#7A8F6B] cursor-pointer bg-zinc-950 border border-white/[0.06]"
-                  >
-                    {availableTurmas.map((t) => (
-                      <option key={t.id} value={t.id} style={{ background: "#1E1E1E", color: "white" }}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  onClick={handleSendRequest}
-                  disabled={requestSubmitting || !selectedOnboardingTurmaId}
-                  className="w-full h-[52px] rounded-xl flex items-center justify-center mt-2 text-zinc-950 bg-[#7A8F6B] hover:bg-[#8da77c] font-semibold text-[15px] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-lg shadow-[#7A8F6B]/10"
-                >
-                  {requestSubmitting ? "Enviando..." : "Enviar Solicitação de Entrada"}
-                </button>
-              </div>
-            ) : (
-              <div className="text-center py-4">
-                <span className="text-[13px] text-zinc-500">Nenhuma turma cadastrada no sistema. Contate o administrador.</span>
-              </div>
-            )}
-
-            {onboardingError && (
-              <p className="text-[12px] text-red-400 mt-4 text-center">{onboardingError}</p>
-            )}
-
-            <button
-              onClick={() => supabase.auth.signOut()}
-              className="mt-6 text-[13px] text-zinc-500 hover:text-zinc-300 underline cursor-pointer"
-            >
-              Sair da conta
-            </button>
-          </motion.div>
-        )}
-      </div>
-    );
-  }
-
   const activeTurmaName = userTurmas?.find(t => t.id === viewTurmaId)?.name || turmaName;
 
   return (
     <div className="flex-1 flex flex-col pb-24 md:pb-6 overflow-auto">
-      <PageHeader tab={tab} onTabChange={setTab} viewTurmaId={viewTurmaId} setViewTurmaId={setViewTurmaId} />
+      <PageHeader tab={tab} onTabChange={setTab} viewTurmaId={viewTurmaId} setViewTurmaId={setViewTurmaId} hideGeral={!profile?.turma_id} />
 
       {/* ─── Greeting + Sync ─── */}
       <div className="px-7 mb-5">
@@ -414,7 +167,9 @@ export function Dashboard() {
             <p className="text-[13px] text-zinc-500 font-light">
               {profile?.turma_id 
                 ? `você está na turma "${activeTurmaName || 'Carregando...'}"`
-                : "Painel do Administrador Geral"}
+                : user?.email === "morcegosnaodormem@gmail.com"
+                  ? "Painel do Administrador Geral"
+                  : "Canal Pessoal (sem turma conectada)"}
             </p>
           </div>
           <div className="flex items-center gap-3">

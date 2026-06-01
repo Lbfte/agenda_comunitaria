@@ -11,9 +11,10 @@ interface PageHeaderProps {
   viewTurmaId?: string;
   setViewTurmaId?: (id: string) => void;
   hideTabs?: boolean;
+  hideGeral?: boolean;
 }
 
-export function PageHeader({ tab, onTabChange, hideLogo = true, viewTurmaId, setViewTurmaId, hideTabs = false }: PageHeaderProps) {
+export function PageHeader({ tab, onTabChange, hideLogo = true, viewTurmaId, setViewTurmaId, hideTabs = false, hideGeral = false }: PageHeaderProps) {
   const { userTurmas, profile } = useAuth();
 
   return (
@@ -44,26 +45,28 @@ export function PageHeader({ tab, onTabChange, hideLogo = true, viewTurmaId, set
           {!hideTabs && (
             <>
               <button
-            onClick={() => onTabChange("pessoal")}
-            className={`h-[33px] px-5 rounded-2xl text-[14px] transition-all border ${
-              tab === "pessoal"
-                ? "bg-[#7A8F6B] border-[#7A8F6B] text-white"
-                : "bg-[rgba(58,58,58,0.35)] border-[#3a3a3a] text-[rgba(255,255,255,0.14)]"
-            }`}
-          >
-            Pessoal
-          </button>
-          <button
-            onClick={() => onTabChange("geral")}
-            className={`h-[33px] px-5 rounded-2xl text-[14px] transition-all border ${
-              tab === "geral"
-                ? "bg-[#7A8F6B] border-[#7A8F6B] text-white"
-                : "bg-[rgba(58,58,58,0.35)] border-[#3a3a3a] text-white"
-            }`}
-          >
-              Geral
-            </button>
-          </>
+                onClick={() => onTabChange("pessoal")}
+                className={`h-[33px] px-5 rounded-2xl text-[14px] transition-all border ${
+                  tab === "pessoal"
+                    ? "bg-[#7A8F6B] border-[#7A8F6B] text-white"
+                    : "bg-[rgba(58,58,58,0.35)] border-[#3a3a3a] text-[rgba(255,255,255,0.14)]"
+                }`}
+              >
+                Pessoal
+              </button>
+              {!hideGeral && (
+                <button
+                  onClick={() => onTabChange("geral")}
+                  className={`h-[33px] px-5 rounded-2xl text-[14px] transition-all border ${
+                    tab === "geral"
+                      ? "bg-[#7A8F6B] border-[#7A8F6B] text-white"
+                      : "bg-[rgba(58,58,58,0.35)] border-[#3a3a3a] text-white"
+                  }`}
+                >
+                  Geral
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
