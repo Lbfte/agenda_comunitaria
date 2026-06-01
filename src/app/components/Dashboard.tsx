@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "./PageHeader";
 import { X, Calendar, RefreshCw, CheckCircle2, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -10,39 +11,16 @@ import { getQueueSize } from "@/lib/local-storage";
 import { useTasks } from "../hooks/useTasks";
 import { checkDeadlineAlerts } from "@/lib/notifications";
 import { CalendarGrid } from "./CalendarGrid";
+import { TaskCreateModal, type TaskFormData } from "./TaskCreateModal";
 import { syncAllWithGoogleCalendar } from "@/lib/sync-engine";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
 
-type Reminder = {
-  id: number;
-  name: string;
-  user: string;
-  userColor: string;
-  userInitials: string;
-  date: string;
-  desc: string;
-};
-
-const reminders: Reminder[] = [
-  { id: 1, name: "Prova de Cálculo", user: "Laís Bembo", userColor: "#8F6B8A", userInitials: "LB", date: "20/03", desc: "Prova" },
-];
-
-type LogEntry = {
-  user: string;
-  initials: string;
-  color: string;
-  action: string;
-  date: string;
-  detail: string;
-};
-
-const recentLogs: LogEntry[] = [
-  { user: "Laís Bembo", initials: "LB", color: "#8F6B8A", action: "add em", date: "20/03", detail: "Prova" },
-];
+// Mocks de lembretes removidos. Usando tarefas do canal pessoal.
 
 export function Dashboard() {
-  const { user, profile, refreshProfile } = useAuth();
+  const router = useRouter();
+  const { user, profile, refreshProfile, userTurmas } = useAuth();
   const { isOnline } = useNetworkStatus();
   const firstName = profile?.full_name?.split(' ')[0] || 'Usuário';
   const [tab, setTab] = useState<"geral" | "pessoal">("geral");
@@ -65,7 +43,7 @@ export function Dashboard() {
         .eq("id", profile.turma_id)
         .single()
         .then(({ data }) => {
-          if (data) setTurmaName(data.name);
+          if (data) setTurmaName((data as any).name);
         });
     }
   }, [profile?.turma_id]);
@@ -74,7 +52,7 @@ export function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
-    async function checkOnboarding() {
+    async function checkOnboarding(currentUser: NonNullable<typeof user>) {
       setOnboardingLoading(true);
       setOnboardingError(null);
 
@@ -89,10 +67,10 @@ export function Dashboard() {
           const { error: insertError } = await supabase
             .from("turma_requests")
             .insert({
-              user_id: user.id,
+              user_id: currentUser.id,
               turma_id: pendingTurmaId,
               status: "pending"
-            });
+            } as any);
 
           if (insertError) {
             console.error("Erro ao inserir solicitação automática:", insertError);
@@ -103,7 +81,7 @@ export function Dashboard() {
         const { data: requestData, error: requestError } = await supabase
           .from("turma_requests")
           .select("*, turmas(name)")
-          .eq("user_id", user.id)
+          .eq("user_id", currentUser.id)
           .eq("status", "pending")
           .maybeSingle();
 
@@ -123,7 +101,7 @@ export function Dashboard() {
           } else if (turmasData) {
             setAvailableTurmas(turmasData);
             if (turmasData.length > 0) {
-              setSelectedOnboardingTurmaId(turmasData[0].id);
+              setSelectedOnboardingTurmaId((turmasData[0] as any).id);
             }
           }
         }
@@ -134,7 +112,7 @@ export function Dashboard() {
       }
     }
 
-    checkOnboarding();
+    checkOnboarding(user);
   }, [user, profile?.turma_id]);
 
   const handleSendRequest = async () => {
@@ -149,7 +127,7 @@ export function Dashboard() {
           user_id: user.id,
           turma_id: selectedOnboardingTurmaId,
           status: "pending"
-        })
+        } as any)
         .select("*, turmas(name)")
         .single();
 
@@ -191,7 +169,7 @@ export function Dashboard() {
         if (turmasData) {
           setAvailableTurmas(turmasData);
           if (turmasData.length > 0) {
-            setSelectedOnboardingTurmaId(turmasData[0].id);
+            setSelectedOnboardingTurmaId((turmasData[0] as any).id);
           }
         }
       }
@@ -217,6 +195,20 @@ export function Dashboard() {
   const [showReminder, setShowReminder] = useState(false);
   const [reminderText, setReminderText] = useState("");
 
+  const handleCreateReminder = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && reminderText.trim() !== '') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      await createPersonalTask({
+        title: reminderText.trim(),
+        shape: 'triangle',
+        shape_color: '#5B8DEF', // cor padrão para lembretes rápidos (avisos)
+        due_date: todayStr,
+      });
+      setReminderText("");
+      setShowReminder(false);
+    }
+  };
+
   // Novos Filtros Inteligentes
   const [categoryFilter, setCategoryFilter] = useState<"todos" | "provas" | "trabalhos" | "atividades" | "avisos">("todos");
   const [periodFilter, setPeriodFilter] = useState<"todos" | "manha" | "tarde" | "noite">("todos");
@@ -225,8 +217,21 @@ export function Dashboard() {
   const [syncingGCal, setSyncingGCal] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
+  // Estado para o modal de criação de tarefa via calendário
+  const [calendarTaskDate, setCalendarTaskDate] = useState<string | null>(null);
+
+  // Controle local de visualização da Turma (para usuários com > 1 turma)
+  const [viewTurmaId, setViewTurmaId] = useState<string>("");
+
+  useEffect(() => {
+    if (profile?.turma_id && !viewTurmaId) {
+      setViewTurmaId(profile.turma_id);
+    }
+  }, [profile?.turma_id, viewTurmaId]);
+
   // Tasks data for deadline alerts e visualização
-  const { tasks } = useTasks(tab);
+  const { tasks, createTask } = useTasks(tab, viewTurmaId || undefined);
+  const { tasks: personalTasks, createTask: createPersonalTask } = useTasks("pessoal");
   const tasksRef = useRef(tasks);
 
   useEffect(() => {
@@ -395,9 +400,11 @@ export function Dashboard() {
     );
   }
 
+  const activeTurmaName = userTurmas?.find(t => t.id === viewTurmaId)?.name || turmaName;
+
   return (
     <div className="flex-1 flex flex-col pb-24 md:pb-6 overflow-auto">
-      <PageHeader tab={tab} onTabChange={setTab} />
+      <PageHeader tab={tab} onTabChange={setTab} viewTurmaId={viewTurmaId} setViewTurmaId={setViewTurmaId} />
 
       {/* ─── Greeting + Sync ─── */}
       <div className="px-7 mb-5">
@@ -406,7 +413,7 @@ export function Dashboard() {
             <h2 className="text-[16px] lg:text-[20px] font-semibold text-white tracking-tight">Olá, {firstName}!</h2>
             <p className="text-[13px] text-zinc-500 font-light">
               {profile?.turma_id 
-                ? `você está na turma "${turmaName || 'Carregando...'}"`
+                ? `você está na turma "${activeTurmaName || 'Carregando...'}"`
                 : "Painel do Administrador Geral"}
             </p>
           </div>
@@ -467,7 +474,7 @@ export function Dashboard() {
               </div>
               <button
                 className="text-[12px] text-zinc-500 hover:text-white flex items-center gap-0.5 transition-colors"
-                onClick={() => navigate("/tasks")}
+                onClick={() => router.push("/tasks")}
               >
                 <span>Listagem</span>
                 <ChevronRight size={12} />
@@ -535,7 +542,42 @@ export function Dashboard() {
             setSelectedDay={setSelectedDay}
             onMonthChange={handleMonthChange}
             tasks={filteredTasks}
+            onAddTask={(date) => setCalendarTaskDate(date)}
           />
+
+          {/* ─── Tarefas do Dia Selecionado ─── */}
+          <div className="px-6 lg:px-0 mt-2 mb-6">
+            <h3 className="text-[14px] font-semibold text-white tracking-wide uppercase mb-3">
+              Tarefas do dia {String(selectedDay).padStart(2, '0')}/{String(month + 1).padStart(2, '0')}
+            </h3>
+            <div className="flex flex-col gap-2">
+              {filteredTasks
+                .filter(t => t.due_date === `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`)
+                .map(task => (
+                  <div key={task.id} className="p-4 rounded-xl border border-white/[0.04] bg-zinc-900/40 hover:bg-zinc-900/60 transition-colors">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: task.shape_color || "#7A8F6B" }}></span>
+                      <h4 className="text-[13px] font-semibold text-white">{task.title}</h4>
+                      {task.due_time && <span className="ml-auto text-[11px] text-zinc-500 font-medium bg-zinc-950 px-2 py-0.5 rounded-full">{task.due_time}</span>}
+                    </div>
+                    {task.description && (
+                      <p className="text-[12px] text-zinc-400 mb-3 pl-4 border-l border-white/[0.04] ml-1">{task.description}</p>
+                    )}
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-2 pt-2 border-t border-white/[0.02]">
+                      <span>
+                        Adicionado por: <strong className="text-zinc-400">{task.created_by === user?.id ? "Você" : "Membro da Turma"}</strong>
+                      </span>
+                      <span className="capitalize">{task.period || "Sem turno"}</span>
+                    </div>
+                  </div>
+                ))}
+              {filteredTasks.filter(t => t.due_date === `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`).length === 0 && (
+                <div className="flex flex-col items-center justify-center p-6 rounded-xl border border-dashed border-white/[0.06] bg-zinc-900/20">
+                  <span className="text-[12px] text-zinc-500">Nenhuma tarefa para este dia.</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ─── Coluna Direita: Lembretes + Alterações ─── */}
@@ -565,57 +607,96 @@ export function Dashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-[#8F6B8A] flex items-center justify-center text-[11px] font-bold text-white shadow-inner">
-                    LB
+                  <div 
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-inner"
+                    style={{ backgroundColor: profile?.color || "#7A8F6B" }}
+                  >
+                    {profile?.initials || "U"}
                   </div>
                   <div>
-                    <p className="text-[12px] font-medium text-white">Laís Bembo</p>
-                    <p className="text-[10px] text-zinc-500">18/03/26</p>
+                    <p className="text-[12px] font-medium text-white">{firstName}</p>
+                    <p className="text-[10px] text-zinc-500">Hoje</p>
                   </div>
-                  <p className="text-[12px] text-zinc-400 italic ml-auto max-w-[140px] truncate">descrição maior aqui</p>
+                  <p className="text-[12px] text-zinc-400 italic ml-auto max-w-[140px] truncate">Anotação pessoal</p>
                 </div>
                 <input
                   value={reminderText}
                   onChange={(e) => setReminderText(e.target.value)}
-                  placeholder="Escrever lembrete..."
+                  onKeyDown={handleCreateReminder}
+                  placeholder="Escrever lembrete... (pressione Enter para salvar)"
                   className="w-full bg-zinc-950 border border-white/[0.04] focus:border-[#7A8F6B]/30 rounded-xl px-3.5 py-2 text-[12px] text-white placeholder-zinc-700 outline-none transition-all"
                 />
               </div>
             )}
           </div>
 
-          {/* ─── Última Alteração ─── */}
+          {/* ─── Lembretes Pessoais ─── */}
           <div className="px-6 lg:px-0 mb-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="h-[24px] px-3.5 rounded-full border border-white/[0.06] bg-white/[0.04] flex items-center">
-                <span className="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider">Última alteração</span>
+                <span className="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider">Meus Lembretes</span>
               </div>
-              <span className="text-[12px] text-zinc-500">18/03 - 0:45</span>
             </div>
 
-            {recentLogs.map((log, i) => (
-              <div key={i} className="flex items-center gap-3 h-[48px] rounded-xl px-4 mb-2.5 border border-white/[0.04] bg-zinc-900/30">
-                <div
-                  className="w-[28px] h-[28px] rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold text-white shadow"
-                  style={{ background: log.color }}
-                >
-                  {log.initials}
+            {personalTasks.filter(t => !t.completed).slice(-5).reverse().map((task) => {
+              const taskDate = task.due_date ? task.due_date.split('-').reverse().slice(0, 2).join('/') : "Sem data";
+              
+              return (
+                <div key={task.id} className="flex items-center gap-3 h-[48px] rounded-xl px-4 mb-2.5 border border-white/[0.04] bg-zinc-900/30">
+                  <div
+                    className="w-[28px] h-[28px] rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold text-white shadow"
+                    style={{ background: task.shape_color || "#5B8DEF" }}
+                  >
+                    {profile?.initials || "U"}
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-[12px] font-medium text-white truncate">{task.title}</span>
+                    <span className="text-[11px] text-zinc-500 truncate">
+                      Adicionado {taskDate}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-[12px] font-medium text-white truncate">{log.user}</span>
-                  <span className="text-[11px] text-zinc-500 truncate">
-                    {log.action} {log.date} - {log.detail}
-                  </span>
-                </div>
-                <svg width="14" height="10" viewBox="0 0 14 10" fill="none" className="shrink-0">
-                  <path d="M14 0V10L0 7L14 0Z" fill="#666" fillOpacity="0.3" />
-                </svg>
-              </div>
-            ))}
+              );
+            })}
+            
+            {personalTasks.filter(t => !t.completed).length === 0 && (
+              <p className="text-[12px] text-zinc-500 text-center py-4">Nenhum lembrete rápido.</p>
+            )}
           </div>
         </div>
 
       </div>
+
+      {/* Modal de criação de tarefa via calendário */}
+      <AnimatePresence>
+        {calendarTaskDate && (
+          <TaskCreateModal
+            channel={tab}
+            editData={{
+              title: '',
+              description: '',
+              due_date: calendarTaskDate,
+              due_time: '',
+              period: '',
+              shape: 'triangle',
+              shape_color: '#666',
+            }}
+            onSubmit={async (data: TaskFormData) => {
+              await createTask({
+                title: data.title,
+                description: data.description || undefined,
+                due_date: data.due_date || undefined,
+                due_time: data.due_time || undefined,
+                period: data.period || undefined,
+                shape: data.shape,
+                shape_color: data.shape_color,
+              }, data.turma_id || profile?.turma_id || undefined);
+              setCalendarTaskDate(null);
+            }}
+            onClose={() => setCalendarTaskDate(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

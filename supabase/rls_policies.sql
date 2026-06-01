@@ -40,10 +40,11 @@ create policy "profiles_select_same_turma" on public.profiles
     or id = auth.uid()
   );
 
--- Atualizar: apenas o próprio perfil
+-- Atualizar: próprio perfil ou administrador
 create policy "profiles_update_own" on public.profiles
-  for update using (id = auth.uid())
-  with check (id = auth.uid());
+  for update using (
+    id = auth.uid() or auth.jwt() ->> 'email' = 'morcegosnaodormem@gmail.com'
+  );
 
 -- ────────────────────────────────────────────────────────────
 -- TURMAS
@@ -67,9 +68,11 @@ create policy "turmas_update_owner" on public.turmas
 create policy "turma_members_select" on public.turma_members
   for select using (public.is_turma_member(turma_id));
 
--- Inserir: o próprio usuário pode entrar (via código de convite)
+-- Inserir: o próprio usuário pode entrar (via código de convite) ou admin
 create policy "turma_members_insert" on public.turma_members
-  for insert with check (user_id = auth.uid());
+  for insert with check (
+    user_id = auth.uid() or auth.jwt() ->> 'email' = 'morcegosnaodormem@gmail.com'
+  );
 
 -- Deletar: sair da turma (apenas a si mesmo) ou admin remove membros
 create policy "turma_members_delete" on public.turma_members

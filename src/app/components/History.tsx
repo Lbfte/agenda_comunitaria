@@ -20,10 +20,10 @@ const actionColors: Record<string, string> = {
 };
 
 export function History() {
-  const [tab, setTab] = useState<"geral" | "pessoal">("geral");
-  const { profile } = useAuth();
+  const [viewTurmaId, setViewTurmaId] = useState<string>("all");
+  const { profile, userTurmas } = useAuth();
   const firstName = profile?.full_name?.split(" ")[0] || "Usuário";
-  const { entries, mentions, loading } = useHistory();
+  const { entries, mentions, loading } = useHistory(viewTurmaId);
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -40,15 +40,25 @@ export function History() {
     ? `${formatDate(lastEntry.created_at)} - ${formatTime(lastEntry.created_at)}`
     : "--";
 
+  const activeTurmaName = viewTurmaId === "all" 
+    ? "Todas as Turmas" 
+    : userTurmas?.find(t => t.id === viewTurmaId)?.name || "Carregando...";
+
   return (
     <div className="flex-1 flex flex-col pb-24 md:pb-6 overflow-auto">
-      <PageHeader tab={tab} onTabChange={setTab} />
+      <PageHeader 
+        tab="geral" 
+        onTabChange={() => {}} 
+        hideTabs={true} 
+        viewTurmaId={viewTurmaId} 
+        setViewTurmaId={setViewTurmaId} 
+      />
 
       {/* Greeting */}
       <div className="px-7 mb-5">
         <h2 className="text-[16px] lg:text-[20px] text-white">Olá, {firstName}!</h2>
         <p className="text-[14px] text-[#707070]">
-          você está em "Notificações: Ciencias da Comp"
+          você está em "Notificações: {activeTurmaName}"
         </p>
       </div>
 

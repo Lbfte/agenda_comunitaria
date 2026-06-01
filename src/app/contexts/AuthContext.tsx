@@ -10,6 +10,7 @@ interface AuthState {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+  userTurmas: { id: string; name: string }[];
 }
 
 interface AuthContextType extends AuthState {
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile: null,
     session: null,
     loading: true,
+    userTurmas: [],
   });
 
   // Atualização inteligente do estado de auth para evitar novos objetos idênticos
@@ -50,20 +52,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      const user = 'user' in newState ? newState.user : prev.user;
-      const session = 'session' in newState ? newState.session : prev.session;
-      const loading = 'loading' in newState ? newState.loading : prev.loading;
+      const user = ('user' in newState && newState.user !== undefined) ? newState.user : prev.user;
+      const session = ('session' in newState && newState.session !== undefined) ? newState.session : prev.session;
+      const loading = ('loading' in newState && newState.loading !== undefined) ? newState.loading : prev.loading;
+      const userTurmas = ('userTurmas' in newState && newState.userTurmas !== undefined) ? (newState.userTurmas as { id: string; name: string }[]) : prev.userTurmas;
 
       if (
         prev.user === user &&
         prev.profile === profile &&
         prev.session === session &&
-        prev.loading === loading
+        prev.loading === loading &&
+        prev.userTurmas === userTurmas
       ) {
         return prev;
       }
 
-      return { user, profile, session, loading };
+      return { user, profile, session, loading, userTurmas };
     });
   }, []);
 
@@ -77,11 +81,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data;
   }, []);
 
+  // Buscar todas as turmas que o usuário faz parte
+  const fetchUserTurmas = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('turma_members')
+      .select(`turma_id, turmas(name)`)
+      .eq('user_id', userId);
+    
+    if (data) {
+      return data.map((d: any) => ({
+        id: d.turma_id,
+        name: Array.isArray(d.turmas) ? d.turmas[0]?.name : d.turmas?.name,
+      }));
+    }
+    return [];
+  }, []);
+
   const refreshProfile = useCallback(async () => {
     if (!state.user) return;
     const profile = await fetchProfile(state.user.id);
-    updateAuthState({ profile });
-  }, [state.user, fetchProfile, updateAuthState]);
+    const userTurmas = await fetchUserTurmas(state.user.id);
+    updateAuthState({ profile, userTurmas });
+  }, [state.user, fetchProfile, fetchUserTurmas, updateAuthState]);
 
   // Inicializar sessão e escutar mudanças
   useEffect(() => {
@@ -94,13 +115,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       if (session?.user) {
         const profile = await fetchProfile(session.user.id);
-        updateAuthState({ user: session.user, profile, session, loading: false });
+        const userTurmas = await fetchUserTurmas(session.user.id);
+        updateAuthState({ user: session.user, profile, userTurmas, session, loading: false });
       } else {
-        updateAuthState({ user: null, profile: null, session: null, loading: false });
+        updateAuthState({ user: null, profile: null, userTurmas: [], session: null, loading: false });
       }
     }).catch((err) => {
       console.error("Erro fatal ao buscar sessão:", err);
-      updateAuthState({ user: null, profile: null, session: null, loading: false });
+      updateAuthState({ user: null, profile: null, userTurmas: [], session: null, loading: false });
     });
 
     // Escutar mudanças de auth (login, logout, token refresh)
@@ -108,15 +130,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
-          updateAuthState({ user: session.user, profile, session, loading: false });
+          const userTurmas = await fetchUserTurmas(session.user.id);
+          updateAuthState({ user: session.user, profile, userTurmas, session, loading: false });
         } else {
-          updateAuthState({ user: null, profile: null, session: null, loading: false });
+          updateAuthState({ user: null, profile: null, userTurmas: [], session: null, loading: false });
         }
       }
     );
 
     return () => subscription.unsubscribe();
-  }, [fetchProfile, updateAuthState]);
+  }, [fetchProfile, fetchUserTurmas, updateAuthState]);
 
   // Login com Google OAuth
   const signInWithGoogle = useCallback(async () => {
@@ -159,7 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Logout
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-    updateAuthState({ user: null, profile: null, session: null, loading: false });
+    updateAuthState({ user: null, profile: null, userTurmas: [], session: null, loading: false });
   }, [updateAuthState]);
 
   const contextValue = useMemo(() => ({

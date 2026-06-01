@@ -34,7 +34,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
   const enrichMessages = useCallback(async (msgs: Message[]): Promise<MessageWithProfile[]> => {
     const currentUser = userRef.current;
     // Buscar perfis que ainda não estão no cache
-    const missingIds = [...new Set(msgs.map((m) => m.user_id))]
+    const missingIds = Array.from(new Set(msgs.map((m) => m.user_id)))
       .filter((id) => !profileCache.current.has(id));
 
     if (missingIds.length > 0) {
@@ -43,7 +43,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
         .select('id, full_name, initials, color')
         .in('id', missingIds);
 
-      (profiles || []).forEach((p) => {
+      (profiles || []).forEach((p: any) => {
         profileCache.current.set(p.id, p);
       });
     }
@@ -121,7 +121,18 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
         setLoading(false);
       }
     }
-  }, [channel, enrichMessages]);
+  }, [channel, turmaId, enrichMessages]);
+
+  // Atualizar o cache sempre que as mensagens mudarem
+  useEffect(() => {
+    const currentUser = userRef.current;
+    if (!currentUser || messages.length === 0) return;
+    
+    const currentTurmaId = turmaIdRef.current;
+    const cacheKey = `messages_${channel}_${currentTurmaId || 'all'}_${currentUser.id}`;
+    
+    localStorage.setItem(cacheKey, JSON.stringify(messages));
+  }, [messages, channel]);
 
   // ─── Send Message ──────────────────────────────────────────
 
@@ -130,6 +141,20 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
     if (!currentUser || !text.trim()) return null;
 
     const activeTurmaId = customTurmaId || turmaIdRef.current;
+    
+    // Optimistic Update: Criar e adicionar localmente antes do Supabase
+    const tempId = crypto.randomUUID();
+    const optimisticMsg: Message = {
+      id: tempId,
+      user_id: currentUser.id,
+      channel,
+      text: text.trim(),
+      turma_id: channel === 'class' ? (activeTurmaId || null) : null,
+      created_at: new Date().toISOString()
+    };
+    
+    const enriched = await enrichMessages([optimisticMsg]);
+    setMessages((prev) => [...prev, ...enriched]);
 
     const { data, error } = await supabase
       .from('messages')
@@ -138,18 +163,20 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
         channel,
         text: text.trim(),
         turma_id: channel === 'class' ? activeTurmaId : undefined,
-      })
+      } as any)
       .select()
       .single();
 
     if (error) {
       console.error('Erro ao enviar mensagem:', error.message);
+      // Rollback em caso de erro severo (opcional)
+      // setTasks((prev) => prev.filter(m => m.id !== tempId));
       return null;
     }
+    
+    // Substituir o ID temporário pelo ID real do banco
+    setMessages((prev) => prev.map(m => m.id === tempId ? { ...m, ...(data as any), isSelf: true } : m));
 
-    // Optimistic — adicionar localmente
-    const enriched = await enrichMessages([data]);
-    setMessages((prev) => [...prev, ...enriched]);
     return data;
   }, [channel, enrichMessages]);
 

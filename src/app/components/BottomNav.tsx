@@ -1,11 +1,11 @@
 "use client";
 
-import { Home, Layers, FileText, Bell, MessageCircle, GraduationCap } from "lucide-react";
+import { Home, FileText, Bell, MessageCircle, GraduationCap, LogOut } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "../contexts/AuthContext";
 
 const mainItems = [
   { icon: Home, label: "Home", path: "/" },
-  { icon: Layers, label: "Cards", path: "/study" },
   { icon: FileText, label: "Lista", path: "/tasks" },
   { icon: MessageCircle, label: "Social", path: "/social" },
   { icon: GraduationCap, label: "Turmas", path: "/turmas" },
@@ -14,6 +14,7 @@ const mainItems = [
 export function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
+  const { signOut } = useAuth();
 
   const isNotification = pathname === "/history";
 
@@ -45,24 +46,36 @@ export function BottomNav() {
           })}
         </div>
 
-        {/* Notification bell - separate pill */}
-        <button
-          onClick={() => router.push("/history")}
-          className="w-[54px] h-[58px] rounded-[23px] flex items-center justify-center relative transition-all shrink-0"
-          style={{ background: isNotification ? "#7A8F6B" : "#292929" }}
-        >
-          <div
-            className="w-[42px] h-[44px] rounded-[18px] flex items-center justify-center"
-            style={{ background: isNotification ? "#7A8F6B" : "#222" }}
+        {/* Actions - separate pills */}
+        <div className="flex gap-1.5 shrink-0">
+          <button
+            onClick={() => router.push("/history")}
+            className="w-[54px] h-[58px] rounded-[23px] flex items-center justify-center relative transition-all"
+            style={{ background: isNotification ? "#7A8F6B" : "#292929" }}
           >
-            <Bell size={16} strokeWidth={2} className={isNotification ? "text-white" : "text-[#888]"} />
-          </div>
-          {!isNotification && (
-            <div className="absolute top-2.5 right-2.5 w-[14px] h-[14px] rounded-full bg-[#E85D5D] flex items-center justify-center">
-              <span className="text-[8px] text-white">1</span>
+            <div
+              className="w-[42px] h-[44px] rounded-[18px] flex items-center justify-center"
+              style={{ background: isNotification ? "#7A8F6B" : "#222" }}
+            >
+              <Bell size={16} strokeWidth={2} className={isNotification ? "text-white" : "text-[#888]"} />
             </div>
-          )}
-        </button>
+            {!isNotification && (
+              <div className="absolute top-2.5 right-2.5 w-[14px] h-[14px] rounded-full bg-[#E85D5D] flex items-center justify-center">
+                <span className="text-[8px] text-white">1</span>
+              </div>
+            )}
+          </button>
+          
+          <button
+            onClick={signOut}
+            className="w-[54px] h-[58px] rounded-[23px] flex items-center justify-center relative transition-all bg-[#292929]"
+            title="Sair"
+          >
+            <div className="w-[42px] h-[44px] rounded-[18px] flex items-center justify-center bg-[#222]">
+              <LogOut size={16} strokeWidth={2} className="text-[#E85D5D]" />
+            </div>
+          </button>
+        </div>
       </div>
     </div>
   );

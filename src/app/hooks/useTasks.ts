@@ -19,7 +19,7 @@ type TaskFilter = {
   type?: 'turma' | 'pessoal';
 };
 
-export function useTasks(channel: 'geral' | 'pessoal') {
+export function useTasks(channel: 'geral' | 'pessoal', overrideTurmaId?: string) {
   const { user, profile } = useAuth();
   const { isOnline } = useNetworkStatus();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -57,7 +57,8 @@ export function useTasks(channel: 'geral' | 'pessoal') {
 
     // Chave de cache
     const filterKey = filter ? `p${filter.period || ''}_c${filter.completed ?? ''}_d${filter.date || ''}` : 'all';
-    const cacheKey = `tasks_${channel}_${filterKey}`;
+    const targetTurmaId = overrideTurmaId || currentProfile?.turma_id || 'none';
+    const cacheKey = `tasks_${channel}_${filterKey}_${targetTurmaId}`;
     
     // SWR: Tentar cache primeiro para renderização imediata, mesmo online
     const cached = getCacheData<Task[]>(cacheKey, 30 * 60 * 1000); // 30 min cache
@@ -87,8 +88,8 @@ export function useTasks(channel: 'geral' | 'pessoal') {
         query = query.eq('type', 'pessoal').eq('created_by', currentUser.id);
       } else {
         query = query.eq('type', 'turma');
-        if (currentProfile?.turma_id) {
-          query = query.eq('turma_id', currentProfile.turma_id);
+        if (overrideTurmaId || currentProfile?.turma_id) {
+          query = query.eq('turma_id', (overrideTurmaId || currentProfile?.turma_id) as string);
         } else if (currentUser.email !== "morcegosnaodormem@gmail.com") {
           // Usuário normal sem turma não vê tarefas de turma
           query = query.eq('turma_id', '00000000-0000-0000-0000-000000000000');
@@ -124,7 +125,7 @@ export function useTasks(channel: 'geral' | 'pessoal') {
         setLoading(false);
       }
     }
-  }, [channel]);
+  }, [channel, overrideTurmaId]);
 
   // ─── Create ────────────────────────────────────────────────
 

@@ -29,13 +29,14 @@ export function Social() {
   
   const [adminTurmas, setAdminTurmas] = useState<{ id: string; name: string }[]>([]);
   const [selectedAdminTurmaId, setSelectedAdminTurmaId] = useState<string>("");
+  const [adminUserIds, setAdminUserIds] = useState<Set<string>>(new Set());
 
+  // Buscar turmas para o admin (todas as turmas do sistema)
   useEffect(() => {
     if (isAdmin && user) {
       supabase
         .from("turmas")
         .select("id, name")
-        .eq("created_by", user.id)
         .order("name", { ascending: true })
         .then(({ data }) => {
           if (data && data.length > 0) {
@@ -48,6 +49,22 @@ export function Social() {
 
   const activeTurmaId = isAdmin ? selectedAdminTurmaId : profile?.turma_id;
   const { messages, loading, sendMessage } = useMessages(channel, activeTurmaId);
+
+  // Buscar IDs dos admins da turma ativa para mostrar badge "Administrador"
+  useEffect(() => {
+    if (!activeTurmaId || channel !== "class") return;
+    
+    supabase
+      .from("turma_members")
+      .select("user_id")
+      .eq("turma_id", activeTurmaId)
+      .eq("role", "admin")
+      .then(({ data }) => {
+        if (data) {
+          setAdminUserIds(new Set(data.map((d) => d.user_id)));
+        }
+      });
+  }, [activeTurmaId, channel]);
 
   const hasNoTurma = channel === "class" && !activeTurmaId;
 
@@ -211,12 +228,26 @@ export function Social() {
                     }}
                   >
                     {!m.isSelf && (
-                      <span
-                        className="text-[11px] block mb-1 font-semibold"
-                        style={{ color: m.profile?.color || getUserColor(m.profile?.full_name || "?") }}
-                      >
-                        {m.profile?.full_name || "Membro"}
-                      </span>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span
+                          className="text-[11px] font-semibold"
+                          style={{ color: m.profile?.color || getUserColor(m.profile?.full_name || "?") }}
+                        >
+                          {m.profile?.full_name || "Membro"}
+                        </span>
+                        {adminUserIds.has(m.user_id) && (
+                          <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full leading-none">
+                            Administrador
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {m.isSelf && adminUserIds.has(m.user_id) && (
+                      <div className="flex justify-end mb-1">
+                        <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded-full leading-none">
+                          Administrador
+                        </span>
+                      </div>
                     )}
                     <p className="text-[13px] text-[rgba(255,255,255,0.85)] leading-relaxed whitespace-pre-wrap break-words">{m.text}</p>
                     <span className="text-[9px] text-[#555] block text-right mt-1.5 font-medium select-none">

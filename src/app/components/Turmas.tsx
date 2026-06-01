@@ -37,7 +37,7 @@ export function Turmas() {
   const { user, profile, refreshProfile } = useAuth();
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [requests, setRequests] = useState<TurmaRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
   
@@ -93,8 +93,33 @@ export function Turmas() {
   }
 
   useEffect(() => {
-    loadData();
-  }, [user]);
+    if (user?.id) {
+      // Atualizar perfil ao montar para detectar aprovações do admin
+      refreshProfile();
+      loadData();
+    }
+  }, [user?.id]);
+
+  // Listener Realtime: detecta quando o admin aprova e atualiza o turma_id do perfil
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('turmas-profile-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        () => {
+          refreshProfile();
+          loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   // Função para solicitar entrada na turma
   const handleRequestAccess = async (targetTurmaId: string, targetTurmaName: string) => {

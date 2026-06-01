@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, ChevronDown } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface TaskCreateModalProps {
   onSubmit: (data: TaskFormData) => void;
@@ -18,6 +19,7 @@ export interface TaskFormData {
   period: 'manha' | 'tarde' | 'noite' | '';
   shape: 'triangle' | 'invTriangle';
   shape_color: string;
+  turma_id?: string;
 }
 
 const periodOptions = [
@@ -31,6 +33,8 @@ const colorOptions = [
 ];
 
 export function TaskCreateModal({ onSubmit, onClose, channel, editData }: TaskCreateModalProps) {
+  const { userTurmas, profile } = useAuth();
+  
   const [form, setForm] = useState<TaskFormData>(editData || {
     title: '',
     description: '',
@@ -39,6 +43,7 @@ export function TaskCreateModal({ onSubmit, onClose, channel, editData }: TaskCr
     period: '',
     shape: 'triangle',
     shape_color: '#666',
+    turma_id: profile?.turma_id || undefined,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -83,6 +88,23 @@ export function TaskCreateModal({ onSubmit, onClose, channel, editData }: TaskCr
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Turma Destino Selector */}
+          {channel === 'geral' && userTurmas.length > 1 && (
+            <div>
+              <label className="text-[12px] text-[#999] block mb-1">Turma Destino</label>
+              <select
+                value={form.turma_id || profile?.turma_id || ""}
+                onChange={(e) => update('turma_id', e.target.value)}
+                className="w-full h-[42px] rounded-xl px-4 text-[13px] text-white outline-none cursor-pointer border border-[#333]"
+                style={{ background: '#222' }}
+              >
+                {userTurmas.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <label className="text-[12px] text-[#999] block mb-1">Título *</label>

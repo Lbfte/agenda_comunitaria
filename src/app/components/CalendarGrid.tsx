@@ -12,6 +12,7 @@ export type CalendarGridProps = {
   setSelectedDay: (day: number) => void;
   onMonthChange: (month: number, year: number) => void;
   tasks: Task[];
+  onAddTask?: (date: string) => void;
 };
 
 const dayHeaders = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -27,7 +28,8 @@ export function CalendarGrid({
   selectedDay,
   setSelectedDay,
   onMonthChange,
-  tasks
+  tasks,
+  onAddTask
 }: CalendarGridProps) {
   const router = useRouter();
 
@@ -122,11 +124,13 @@ export function CalendarGrid({
               const dayTasks = getTasksForDay(day);
               const hasEvents = dayTasks.length > 0;
 
+              const formattedDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
               return (
                 <button
                   key={`day-${day}`}
                   onClick={() => setSelectedDay(day)}
-                  className="h-12 flex flex-col items-center justify-between py-1.5 rounded-xl relative focus:outline-none select-none active:scale-95 transition-all"
+                  className="h-12 flex flex-col items-center justify-between py-1.5 rounded-xl relative focus:outline-none select-none active:scale-95 transition-all group/day"
                 >
                   {/* Fundo para dia selecionado */}
                   {isSelected && (
@@ -135,6 +139,23 @@ export function CalendarGrid({
                       className="absolute inset-0 bg-[#7A8F6B] rounded-xl shadow-lg shadow-[#7A8F6B]/20"
                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
                     />
+                  )}
+
+                  {/* Ícone + no hover para adicionar tarefa */}
+                  {onAddTask && (
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddTask(formattedDate);
+                      }}
+                      className={`absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover/day:opacity-100 transition-opacity z-20 cursor-pointer ${
+                        isSelected
+                          ? "bg-zinc-950/20 hover:bg-zinc-950/40 text-zinc-950"
+                          : "bg-[#7A8F6B]/20 hover:bg-[#7A8F6B]/40 text-[#9EBF8A]"
+                      }`}
+                    >
+                      <Plus size={10} strokeWidth={3} />
+                    </div>
                   )}
 
                   {/* Número do Dia */}

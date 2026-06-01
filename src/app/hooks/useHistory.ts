@@ -16,11 +16,11 @@ export interface MentionWithContext {
   mentioner?: Pick<Profile, 'full_name' | 'initials' | 'color'> | null;
 }
 
-export function useHistory() {
+export function useHistory(filterTurmaId?: string) {
   const { user } = useAuth();
   const [entries, setEntries] = useState<HistoryEntryWithProfile[]>([]);
   const [mentions, setMentions] = useState<MentionWithContext[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const userRef = useRef(user);
   const activeFetchRef = useRef<AbortController | null>(null);
@@ -71,14 +71,24 @@ export function useHistory() {
 
     try {
       // Buscar histórico com perfil do autor
-      const { data: historyData, error: historyError } = await supabase
+      let query = supabase
         .from('history')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50)
         .abortSignal(controller.signal);
 
+      if (filterTurmaId && filterTurmaId !== 'all') {
+        query = query.eq('turma_id', filterTurmaId);
+      }
+
+      const { data: historyData, error: historyError } = await query;
+
       if (historyError) {
+        // Silenciar erros de abort (navegação entre abas)
+        if (historyError.message?.includes('AbortError') || historyError.message?.includes('aborted')) {
+          return;
+        }
         console.error('Erro ao buscar histórico:', historyError.message);
         setLoading(false);
         return;
@@ -168,7 +178,7 @@ export function useHistory() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [filterTurmaId]);
 
   useEffect(() => {
     fetchHistory();

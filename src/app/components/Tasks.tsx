@@ -18,12 +18,21 @@ import { KanbanBoard } from "./KanbanBoard";
 export function Tasks() {
   const [tab, setTab] = useState<"geral" | "pessoal">("geral");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const { user, profile } = useAuth();
+  const { user, profile, userTurmas } = useAuth();
   const firstName = profile?.full_name?.split(" ")[0] || "Usuário";
+
+  // Controle local de visualização da Turma (para usuários com > 1 turma)
+  const [viewTurmaId, setViewTurmaId] = useState<string>("");
+
+  useEffect(() => {
+    if (profile?.turma_id && !viewTurmaId) {
+      setViewTurmaId(profile.turma_id);
+    }
+  }, [profile?.turma_id, viewTurmaId]);
 
   // Buscar tarefas usando o hook otimizado
   const { tasks, loading, isOnline, pendingCount, fetchTasks, createTask, completeTask, deleteTask } =
-    useTasks(tab);
+    useTasks(tab, viewTurmaId || undefined);
 
   // Novos Estados
   const [viewMode, setViewMode] = useState<"lista" | "cards" | "kanban">("lista");
@@ -122,7 +131,7 @@ export function Tasks() {
       period: (form.period as 'manha' | 'tarde' | 'noite') || undefined,
       shape: form.shape,
       shape_color: form.shape_color,
-    }, profile?.turma_id || undefined);
+    }, form.turma_id || profile?.turma_id || undefined);
 
     if (result && !result.success) {
       alert("Erro ao salvar tarefa: " + (result.error || "Tente novamente."));
@@ -278,7 +287,9 @@ export function Tasks() {
             <div className="shrink-0 flex items-center gap-1.5">
               <SyncStatusBadge isOnline={isOnline} pendingCount={0} syncStatus={task.sync_status} />
               {task.google_calendar_event_id && (
-                <Calendar size={12} className="text-[#9EBF8A]/70" title="Integrado com Google Calendar" />
+                <span>
+                  <Calendar size={12} className="text-[#9EBF8A]/70" />
+                </span>
               )}
             </div>
           </div>
@@ -388,9 +399,11 @@ export function Tasks() {
     );
   };
 
+  const activeTurmaName = userTurmas?.find(t => t.id === viewTurmaId)?.name || 'Carregando...';
+
   return (
     <div className="flex-1 flex flex-col pb-24 md:pb-6 overflow-auto">
-      <PageHeader tab={tab} onTabChange={setTab} />
+      <PageHeader tab={tab} onTabChange={setTab} viewTurmaId={viewTurmaId} setViewTurmaId={setViewTurmaId} />
 
       {/* Greeting + Sync Status */}
       <div className="px-7 mb-5">
@@ -398,7 +411,9 @@ export function Tasks() {
           <div>
             <h2 className="text-[16px] lg:text-[20px] font-semibold text-white tracking-tight">Olá, {firstName}!</h2>
             <p className="text-[13px] text-zinc-500 font-light">
-              você está na aba "Listas: Ciências da Comp"
+              {tab === "geral" 
+                ? `você está na aba "Listas: ${activeTurmaName}"`
+                : 'você está na aba "Listas: Pessoais"'}
             </p>
           </div>
           

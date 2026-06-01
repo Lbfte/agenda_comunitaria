@@ -9,7 +9,6 @@ import { supabase } from "@/lib/supabase";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
-  { icon: Layers, label: "Cards", path: "/study" },
   { icon: FileText, label: "Lista", path: "/tasks" },
   { icon: MessageCircle, label: "Social", path: "/social" },
   { icon: GraduationCap, label: "Turmas", path: "/turmas" },
@@ -30,7 +29,7 @@ export function Sidebar() {
           .eq("id", profile.turma_id)
           .single()
           .then(({ data }) => {
-            if (data) setTurmaName(data.name);
+            if (data) setTurmaName((data as any).name);
           });
     }
   }, [profile?.turma_id]);

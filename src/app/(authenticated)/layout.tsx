@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "@/app/components/Sidebar";
 import { BottomNav } from "@/app/components/BottomNav";
 import { SplashScreen } from "@/app/components/SplashScreen";
@@ -14,6 +15,28 @@ export default function AuthenticatedLayout({
 }) {
   const [showSplash, setShowSplash] = useState(true);
   const { user, loading } = useAuth();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      "/": "Agenda da Turma - Home",
+      "/tasks": "Agenda da Turma - Lista",
+      "/social": "Agenda da Turma - Social",
+      "/turmas": "Agenda da Turma - Turmas",
+      "/history": "Agenda da Turma - Alertas",
+      "/admin": "Agenda da Turma - Admin",
+    };
+    
+    // Check if pathname matches any or starts with any (for subroutes)
+    const exactTitle = titles[pathname];
+    if (exactTitle) {
+      document.title = exactTitle;
+    } else if (pathname.startsWith("/tasks")) {
+      document.title = titles["/tasks"];
+    } else {
+      document.title = "Agenda da Turma";
+    }
+  }, [pathname]);
 
   const handleFinish = useCallback(() => setShowSplash(false), []);
 
