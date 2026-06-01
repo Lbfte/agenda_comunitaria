@@ -62,7 +62,28 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
     const currentTurmaId = turmaIdRef.current;
     const cacheKey = `messages_${channel}_${currentTurmaId || 'all'}_${currentUser.id}`;
 
-    // SWR: Tentar usar cache local primeiro
+    // COMPORTAMENTO LOCAL PARA CHAT PRIVADO (NOTAS PESSOAIS)
+    if (channel === 'private') {
+      const localStorageKey = `agenda_turma_private_msgs_${currentUser.id}`;
+      try {
+        const storedStr = localStorage.getItem(localStorageKey);
+        if (storedStr) {
+          const parsed = JSON.parse(storedStr);
+          const enriched = await enrichMessages(parsed);
+          setMessages(enriched);
+        } else {
+          setMessages([]);
+        }
+      } catch (e) {
+        console.error('Erro ao ler mensagens privadas locais:', e);
+        setMessages([]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // SWR: Tentar usar cache local primeiro (Apenas para canal geral/class)
     const cachedStr = localStorage.getItem(cacheKey);
     if (cachedStr) {
       try {
@@ -88,15 +109,13 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
       let query = supabase
         .from('messages')
         .select('*')
-        .eq('channel', channel)
+        .eq('channel', 'class')
         .order('created_at', { ascending: true })
         .limit(100);
 
-      if (channel === 'private') {
-        query = query.eq('user_id', currentUser.id);
-      } else if (channel === 'class' && currentTurmaId) {
+      if (currentTurmaId) {
         query = query.eq('turma_id', currentTurmaId);
-      } else if (channel === 'class' && !currentTurmaId) {
+      } else {
         // Se não houver turmaId em canal de turma, retorna vazio
         setMessages([]);
         setLoading(false);
@@ -123,10 +142,10 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
     }
   }, [channel, turmaId, enrichMessages]);
 
-  // Atualizar o cache sempre que as mensagens mudarem
+  // Atualizar o cache sempre que as mensagens mudarem (somente para canal de turma)
   useEffect(() => {
     const currentUser = userRef.current;
-    if (!currentUser || messages.length === 0) return;
+    if (!currentUser || messages.length === 0 || channel === 'private') return;
     
     const currentTurmaId = turmaIdRef.current;
     const cacheKey = `messages_${channel}_${currentTurmaId || 'all'}_${currentUser.id}`;
@@ -142,7 +161,32 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
 
     const activeTurmaId = customTurmaId || turmaIdRef.current;
     
-    // Optimistic Update: Criar e adicionar localmente antes do Supabase
+    // COMPORTAMENTO LOCAL PARA CHAT PRIVADO (NOTAS PESSOAIS)
+    if (channel === 'private') {
+      const localMsg: Message = {
+        id: crypto.randomUUID(),
+        user_id: currentUser.id,
+        channel: 'private',
+        text: text.trim(),
+        turma_id: null,
+        created_at: new Date().toISOString()
+      };
+
+      const enriched = await enrichMessages([localMsg]);
+      setMessages((prev) => {
+        const updated = [...prev, ...enriched];
+        const localStorageKey = `agenda_turma_private_msgs_${currentUser.id}`;
+        try {
+          localStorage.setItem(localStorageKey, JSON.stringify(updated.map(({ profile, isSelf, ...m }) => m)));
+        } catch (e) {
+          console.error('Erro ao salvar mensagens privadas locais:', e);
+        }
+        return updated;
+      });
+      return localMsg;
+    }
+
+    // Optimistic Update: Criar e adicionar localmente antes do Supabase (Apenas canal de turma)
     const tempId = crypto.randomUUID();
     const optimisticMsg: Message = {
       id: tempId,
@@ -190,7 +234,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
 
   useEffect(() => {
     const currentUser = userRef.current;
-    if (!currentUser) return;
+    if (!currentUser || channel === 'private') return; // Ignorar Realtime para canal privado local
 
     const currentTurmaId = turmaIdRef.current;
 

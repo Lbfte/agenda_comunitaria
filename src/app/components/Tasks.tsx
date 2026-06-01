@@ -16,10 +16,18 @@ import { motion, AnimatePresence } from "motion/react";
 import { KanbanBoard } from "./KanbanBoard";
 
 export function Tasks() {
-  const [tab, setTab] = useState<"geral" | "pessoal">("geral");
+  const [tab, setTab] = useState<"geral" | "pessoal">("pessoal");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { user, profile, userTurmas } = useAuth();
   const firstName = profile?.full_name?.split(" ")[0] || "Usuário";
+
+  useEffect(() => {
+    if (profile?.turma_id) {
+      setTab("geral");
+    } else {
+      setTab("pessoal");
+    }
+  }, [profile?.turma_id]);
 
   // Controle local de visualização da Turma (para usuários com > 1 turma)
   const [viewTurmaId, setViewTurmaId] = useState<string>("");
@@ -403,7 +411,7 @@ export function Tasks() {
 
   return (
     <div className="flex-1 flex flex-col pb-24 md:pb-6 overflow-auto">
-      <PageHeader tab={tab} onTabChange={setTab} viewTurmaId={viewTurmaId} setViewTurmaId={setViewTurmaId} />
+      <PageHeader tab={tab} onTabChange={setTab} viewTurmaId={viewTurmaId} setViewTurmaId={setViewTurmaId} hideGeral={!profile?.turma_id} />
 
       {/* Greeting + Sync Status */}
       <div className="px-7 mb-5">
@@ -413,7 +421,9 @@ export function Tasks() {
             <p className="text-[13px] text-zinc-500 font-light">
               {tab === "geral" 
                 ? `você está na aba "Listas: ${activeTurmaName}"`
-                : 'você está na aba "Listas: Pessoais"'}
+                : profile?.turma_id
+                  ? 'você está na aba "Listas: Pessoais"'
+                  : 'você está na aba "Listas: Pessoais (sem turma conectada)"'}
             </p>
           </div>
           

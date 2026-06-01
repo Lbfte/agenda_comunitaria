@@ -9,6 +9,7 @@ import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import { SyncStatusBadge } from "./SyncStatusBadge";
 import { getQueueSize } from "@/lib/local-storage";
 import { useTasks } from "../hooks/useTasks";
+import { useLocalReminders } from "../hooks/useLocalReminders";
 import { checkDeadlineAlerts } from "@/lib/notifications";
 import { CalendarGrid } from "./CalendarGrid";
 import { TaskCreateModal, type TaskFormData } from "./TaskCreateModal";
@@ -60,13 +61,7 @@ export function Dashboard() {
 
   const handleCreateReminder = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && reminderText.trim() !== '') {
-      const todayStr = new Date().toISOString().split('T')[0];
-      await createPersonalTask({
-        title: reminderText.trim(),
-        shape: 'triangle',
-        shape_color: '#5B8DEF', // cor padrão para lembretes rápidos (avisos)
-        due_date: todayStr,
-      });
+      addReminder(reminderText.trim(), '#5B8DEF');
       setReminderText("");
       setShowReminder(false);
     }
@@ -94,7 +89,8 @@ export function Dashboard() {
 
   // Tasks data for deadline alerts e visualização
   const { tasks, createTask } = useTasks(tab, viewTurmaId || undefined);
-  const { tasks: personalTasks, createTask: createPersonalTask } = useTasks("pessoal");
+  const { createTask: createGeralTask } = useTasks("geral", viewTurmaId || undefined);
+  const { reminders, addReminder } = useLocalReminders();
   const tasksRef = useRef(tasks);
 
   useEffect(() => {
@@ -393,7 +389,7 @@ export function Dashboard() {
               </div>
             </div>
 
-            {personalTasks.filter(t => !t.completed).slice(-5).reverse().map((task) => {
+            {reminders.filter(t => !t.completed).slice(-5).reverse().map((task) => {
               const taskDate = task.due_date ? task.due_date.split('-').reverse().slice(0, 2).join('/') : "Sem data";
               
               return (
@@ -414,7 +410,7 @@ export function Dashboard() {
               );
             })}
             
-            {personalTasks.filter(t => !t.completed).length === 0 && (
+            {reminders.filter(t => !t.completed).length === 0 && (
               <p className="text-[12px] text-zinc-500 text-center py-4">Nenhum lembrete rápido.</p>
             )}
           </div>
@@ -437,7 +433,8 @@ export function Dashboard() {
               shape_color: '#666',
             }}
             onSubmit={async (data: TaskFormData) => {
-              await createTask({
+              const targetCreateTask = profile?.turma_id ? createGeralTask : createTask;
+              await targetCreateTask({
                 title: data.title,
                 description: data.description || undefined,
                 due_date: data.due_date || undefined,

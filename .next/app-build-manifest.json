@@ -26,7 +26,7 @@
       "static/chunks/659-7277c765f05cc78e.js",
       "static/chunks/app/auth/callback/page-e12db33d3d4d8d3a.js"
     ],
-    "/(authenticated)/page": [
+    "/(authenticated)/admin/requests/page": [
       "static/chunks/webpack-250fde1be99c5bd2.js",
       "static/chunks/fd9d1056-8fef90fb5a0b2194.js",
       "static/chunks/117-4140e3c601b33f38.js",
@@ -34,8 +34,7 @@
       "static/chunks/44530001-e18ccc81b8ed261e.js",
       "static/chunks/659-7277c765f05cc78e.js",
       "static/chunks/753-5324b5a6f6d07f0c.js",
-      "static/chunks/900-4adef425a1a0bf2a.js",
-      "static/chunks/app/(authenticated)/page-898a361baac29960.js"
+      "static/chunks/app/(authenticated)/admin/requests/page-62098d0025f8c3fb.js"
     ],
     "/(authenticated)/layout": [
       "static/chunks/webpack-250fde1be99c5bd2.js",
@@ -47,7 +46,7 @@
       "static/chunks/753-5324b5a6f6d07f0c.js",
       "static/chunks/app/(authenticated)/layout-86ecf28da937a7bc.js"
     ],
-    "/(authenticated)/admin/requests/page": [
+    "/(authenticated)/page": [
       "static/chunks/webpack-250fde1be99c5bd2.js",
       "static/chunks/fd9d1056-8fef90fb5a0b2194.js",
       "static/chunks/117-4140e3c601b33f38.js",
@@ -55,7 +54,8 @@
       "static/chunks/44530001-e18ccc81b8ed261e.js",
       "static/chunks/659-7277c765f05cc78e.js",
       "static/chunks/753-5324b5a6f6d07f0c.js",
-      "static/chunks/app/(authenticated)/admin/requests/page-62098d0025f8c3fb.js"
+      "static/chunks/900-4adef425a1a0bf2a.js",
+      "static/chunks/app/(authenticated)/page-35ab5dff2b9609b0.js"
     ],
     "/(authenticated)/history/page": [
       "static/chunks/webpack-250fde1be99c5bd2.js",
@@ -76,7 +76,7 @@
       "static/chunks/659-7277c765f05cc78e.js",
       "static/chunks/753-5324b5a6f6d07f0c.js",
       "static/chunks/900-4adef425a1a0bf2a.js",
-      "static/chunks/app/(authenticated)/tasks/page-cf53bdd9a1bfd652.js"
+      "static/chunks/app/(authenticated)/tasks/page-726a6755fb0671ea.js"
     ],
     "/(authenticated)/social/page": [
       "static/chunks/webpack-250fde1be99c5bd2.js",
@@ -85,7 +85,7 @@
       "static/chunks/main-app-5f982e2ee3576753.js",
       "static/chunks/44530001-e18ccc81b8ed261e.js",
       "static/chunks/659-7277c765f05cc78e.js",
-      "static/chunks/app/(authenticated)/social/page-c93d47f6102bf718.js"
+      "static/chunks/app/(authenticated)/social/page-8dd62d859b33d7f2.js"
     ],
     "/(authenticated)/turmas/page": [
       "static/chunks/webpack-250fde1be99c5bd2.js",

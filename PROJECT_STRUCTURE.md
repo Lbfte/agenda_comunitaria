@@ -110,7 +110,7 @@
 | `BottomNav.tsx` | Navegação inferior móvel (visível apenas em telas `< md`). Pill com 5 ícones + pill separada para notificações com badge contador. |
 | `PageHeader.tsx` | Header reutilizável com logo (mobile) e toggle de abas `Pessoal`/`Geral`. Usado por `Tasks`, `StudyHub` e `History`. |
 | `AppLogo.tsx` | Componente SVG do logo da aplicação (3 quadrados coloridos: amarelo, cinza e verde). Aceita prop `size`. |
-| `SplashScreen.tsx` | Tela de splash animada com 3 quadrados que aparecem em sequência (400ms cada) + texto "Agenda da Turma". Auto-dismiss após 2s. |
+| `SplashScreen.tsx` | Tela de splash animada com 3 quadrados que aparecem em sequência (400ms cada) + texto "Agenda da Turma". Auto-dismiss após 2s. Se a carga demorar mais que 4s, exibe um botão de emergência para limpar cookies/localStorage e recarregar o app. |
 
 ### Autenticação
 
@@ -123,10 +123,10 @@
 
 | Componente | Responsabilidade |
 |---|---|
-| `Dashboard.tsx` | **Página principal (Home).** Exibe calendário acadêmico (`CalendarGrid`), listagem detalhada das tarefas do dia selecionado com filtros por categoria, badge de sincronização, painel e criação de Lembretes Rápidos pessoais (usando `useTasks('pessoal')`) e botão de sincronização com Google Calendar. Usa `useTasks('geral')` para os itens principais da turma. |
-| `Tasks.tsx` | **Gerenciador de tarefas completo.** Duas views: Lista com filtros avançados (busca, período, status, categoria) e **Kanban Board** cronológico. Modal de criação/edição (`TaskCreateModal`). Toggle entre `Geral` e `Pessoal`. Sincronização com Google Calendar. |
+| `Dashboard.tsx` | **Página principal (Home).** Exibe calendário acadêmico (`CalendarGrid`), listagem detalhada das tarefas do dia selecionado com filtros por categoria, lembretes rápidos (persistidos localmente no `localStorage` via `useLocalReminders`) e sincronização com Google Calendar. Permite acesso imediato ao canal pessoal para usuários sem turma, ocultando a aba Geral. |
+| `Tasks.tsx` | **Gerenciador de tarefas completo.** Duas views: Lista com filtros avançados e **Kanban Board** cronológico. Permite alternar entre Geral/Pessoal. Se o usuário estiver sem turma conectada, inicia automaticamente na aba "Pessoal", oculta a aba "Geral" e atualiza a saudação. |
 | `Social.tsx` | **Central social.** Chat em tempo real da turma (via Supabase Realtime `postgres_changes`) + notas pessoais criptografadas. Toggle entre canais `class` e `private`. Admin pode visualizar chats de todas as turmas que criou via dropdown. |
-| `History.tsx` | **Histórico de atividades.** Exibe log de ações (adição, edição, deleção, conclusão) com perfil do autor, menções ao usuário e timestamps. Toggle `Geral`/`Pessoal`. |
+| `History.tsx` | **Histórico de atividades (Alertas).** Exibe log de ações, menções e timestamps. Para usuários sem turma, renderiza um card interativo no topo exibindo o status da solicitação pendente (com opções de verificar/cancelar) ou atalho para ingressar em uma turma. |
 | `Turmas.tsx` | **Gerenciamento de turmas.** Busca textual de turmas, solicitação de entrada, criação de novas turmas (com código de convite), botão de sair da turma, onboarding para usuários sem turma. |
 | `AdminRequests.tsx` | **Painel administrativo.** Lista solicitações pendentes de entrada em turmas com perfil do aluno, data e turma alvo. Ações: Aprovar (atualiza perfil + insere em `turma_members` + deleta request) ou Rejeitar (deleta request). Escuta em tempo real via Realtime. |
 
@@ -146,7 +146,8 @@
 | Hook | Responsabilidade |
 |---|---|
 | `useTasks.ts` | Hook principal de gerenciamento de tarefas. CRUD completo com **optimistic updates**, cache SWR local (30min TTL), fila offline, sincronização automática ao reconectar, abort de fetches duplicados. Aceita canal (`geral`/`pessoal`). Filtra tarefas por turma do perfil (RLS). |
-| `useMessages.ts` | Hook de chat/mensagens. Fetch com cache SWR, envio otimista, cache de perfis de usuários, subscrição Realtime para mensagens nuevas (evita duplicatas), abort de fetches. Aceita canal (`class`/`private`) e `turmaId`. |
+| `useLocalReminders.ts` | Hook de gerenciamento de lembretes rápidos locais. Armazena e manipula lembretes de forma 100% isolada e offline no `localStorage` por ID de usuário, livre de conexões com o banco. |
+| `useMessages.ts` | Hook de chat/mensagens. Fetch com cache SWR, envio otimista, cache de perfis de usuários, subscrição Realtime para mensagens novas (evita duplicatas), abort de fetches. Aceita canal (`class`/`private`) e `turmaId`. Se for canal privado, opera de forma 100% local em `localStorage` para notas pessoais totalmente offline. |
 | `useHistory.ts` | Hook de histórico de atividades. Busca entradas com perfis enriquecidos, menções ao usuário com contexto, cache SWR, subscrição Realtime para novas entradas. |
 | `useNetworkStatus.ts` | Hook simples de monitoramento de rede. Retorna `{ isOnline }` reativo via `navigator.onLine` + event listeners `online`/`offline`. |
 
@@ -164,10 +165,10 @@ layout.tsx
     ├── Sidebar.tsx
     ├── BottomNav.tsx
     └── [page].tsx → [Componente principal]
-         ├── Dashboard.tsx → useTasks, CalendarGrid, SyncStatusBadge, sync-engine, notifications
-         ├── Tasks.tsx → useTasks, KanbanBoard, TaskCreateModal, SyncStatusBadge, sync-engine
-         ├── StudyHub.tsx → useFlashcards, FlashcardFolderModal, FlashcardEditModal, spaced-repetition
-         ├── Social.tsx → useMessages
+          ├── Dashboard.tsx → useTasks, useLocalReminders, CalendarGrid, SyncStatusBadge, sync-engine, notifications
+          ├── Tasks.tsx → useTasks, KanbanBoard, TaskCreateModal, SyncStatusBadge, sync-engine
+          ├── StudyHub.tsx → useFlashcards, FlashcardFolderModal, FlashcardEditModal, spaced-repetition
+          ├── Social.tsx → useMessages
          ├── History.tsx → useHistory
          ├── Turmas.tsx → supabase (direto)
          └── AdminRequests.tsx → supabase (direto)
