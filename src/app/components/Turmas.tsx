@@ -12,12 +12,13 @@ import {
   X, 
   AlertTriangle, 
   LogOut, 
-  HelpCircle, 
+  HelpCircle,
   ArrowLeft,
   RefreshCw,
   Plus
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ADMIN_EMAIL } from "@/lib/constants";
 
 type Turma = {
   id: string;
@@ -67,7 +68,7 @@ export function Turmas() {
     setLoading(true);
     try {
       // 1. Buscar todas as turmas
-      const { data: turmasData, error: turmasError } = await supabase
+      const { data: turmasData, error: turmasError } = await (supabase as any)
         .from("turmas")
         .select("id, name, code, created_at")
         .order("name", { ascending: true });
@@ -75,7 +76,7 @@ export function Turmas() {
       if (turmasError) throw turmasError;
 
       // 2. Buscar solicitações do usuário
-      const { data: requestsData, error: requestsError } = await supabase
+      const { data: requestsData, error: requestsError } = await (supabase as any)
         .from("turma_requests")
         .select("id, turma_id, status")
         .eq("user_id", user.id);
@@ -155,13 +156,13 @@ export function Turmas() {
       }
 
       // Enviar a nova solicitação
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("turma_requests")
         .insert({
           user_id: user.id,
           turma_id: targetTurmaId,
           status: "pending"
-        })
+        } as any)
         .select("id, turma_id, status")
         .single();
 
@@ -195,7 +196,7 @@ export function Turmas() {
 
     try {
       // 1. Deletar solicitação anterior
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await (supabase as any)
         .from("turma_requests")
         .delete()
         .eq("id", oldRequestId);
@@ -203,13 +204,13 @@ export function Turmas() {
       if (deleteError) throw deleteError;
 
       // 2. Inserir a nova solicitação
-      const { data: newRequest, error: insertError } = await supabase
+      const { data: newRequest, error: insertError } = await (supabase as any)
         .from("turma_requests")
         .insert({
           user_id: user.id,
           turma_id: newTurmaId,
           status: "pending"
-        })
+        } as any)
         .select("id, turma_id, status")
         .single();
 
@@ -240,7 +241,7 @@ export function Turmas() {
     setMessage(null);
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("turma_requests")
         .delete()
         .eq("id", requestId);
@@ -274,7 +275,7 @@ export function Turmas() {
 
     try {
       // 1. Remover do membro da turma
-      const { error: memberError } = await supabase
+      const { error: memberError } = await (supabase as any)
         .from("turma_members")
         .delete()
         .eq("user_id", user.id)
@@ -283,9 +284,9 @@ export function Turmas() {
       if (memberError) throw memberError;
 
       // 2. Limpar o turma_id no perfil do usuário
-      const { error: profileError } = await supabase
+      const { error: profileError } = await (supabase as any)
         .from("profiles")
-        .update({ turma_id: null })
+        .update({ turma_id: null } as any)
         .eq("id", user.id);
 
       if (profileError) throw profileError;
@@ -324,13 +325,13 @@ export function Turmas() {
 
     try {
       // 1. Inserir a nova turma no Supabase
-      const { data: createdTurma, error: createError } = await supabase
+      const { data: createdTurma, error: createError } = await (supabase as any)
         .from("turmas")
         .insert({
           name: newTurmaName.trim(),
           code: cleanCode,
           created_by: user.id
-        })
+        } as any)
         .select()
         .single();
 
@@ -343,22 +344,22 @@ export function Turmas() {
 
       if (createdTurma) {
         // 2. Inserir em turma_members como admin
-        const { error: memberError } = await supabase
+        const { error: memberError } = await (supabase as any)
           .from("turma_members")
           .insert({
             turma_id: createdTurma.id,
             user_id: user.id,
             role: "admin"
-          });
+          } as any);
 
         if (memberError) throw memberError;
 
         // 3. Se NÃO for o administrador geral, associar a turma no perfil do próprio criador
-        const isAdminGeral = user.email === "morcegosnaodormem@gmail.com";
+        const isAdminGeral = user.email === ADMIN_EMAIL;
         if (!isAdminGeral) {
-          const { error: profileError } = await supabase
+          const { error: profileError } = await (supabase as any)
             .from("profiles")
-            .update({ turma_id: createdTurma.id })
+            .update({ turma_id: createdTurma.id } as any)
             .eq("id", user.id);
 
           if (profileError) throw profileError;

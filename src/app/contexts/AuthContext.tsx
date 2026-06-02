@@ -81,7 +81,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data;
   }, []);
 
-  // Buscar todas as turmas que o usuário faz parte
   const fetchUserTurmas = useCallback(async (userId: string) => {
     const { data } = await supabase
       .from('turma_members')
@@ -89,9 +88,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('user_id', userId);
     
     if (data) {
-      return data.map((d: any) => ({
+      type TurmaMemberData = {
+        turma_id: string;
+        turmas: { name: string } | { name: string }[] | null;
+      };
+      
+      const memberData = data as unknown as TurmaMemberData[];
+      return memberData.map((d) => ({
         id: d.turma_id,
-        name: Array.isArray(d.turmas) ? d.turmas[0]?.name : d.turmas?.name,
+        name: (Array.isArray(d.turmas) ? d.turmas[0]?.name : d.turmas?.name) || "Desconhecida",
       }));
     }
     return [];

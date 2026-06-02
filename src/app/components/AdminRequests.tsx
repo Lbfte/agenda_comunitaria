@@ -58,7 +58,7 @@ export function AdminRequests() {
         console.error("Erro ao carregar solicitações:", error);
         setMessage({ text: "Não foi possível carregar as solicitações.", type: "error" });
       } else if (data) {
-        setRequests(data as any);
+        setRequests(data as unknown as RequestWithDetails[]);
       }
     } catch (err) {
       console.error(err);
@@ -94,7 +94,7 @@ export function AdminRequests() {
 
     try {
       // 1. Atualizar o perfil do aluno com o turma_id
-      const { error: profileError } = await supabase
+      const { error: profileError } = await (supabase as any)
         .from("profiles")
         .update({ turma_id: request.turma_id })
         .eq("id", request.user_id);
@@ -102,7 +102,7 @@ export function AdminRequests() {
       if (profileError) throw profileError;
 
       // 2. Inserir o aluno em turma_members
-      const { error: memberError } = await supabase
+      const { error: memberError } = await (supabase as any)
         .from("turma_members")
         .insert({
           turma_id: request.turma_id,

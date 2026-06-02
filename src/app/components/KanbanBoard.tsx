@@ -4,7 +4,7 @@ import React, { useMemo } from "react";
 import { CheckCircle2, Circle, Clock, Trash2, Calendar, AlertCircle, RefreshCw } from "lucide-react";
 import type { Task } from "@/lib/database.types";
 import { motion, AnimatePresence } from "motion/react";
-import { SyncStatusBadge } from "./SyncStatusBadge";
+import { SyncStatusBadge } from "./shared/SyncStatusBadge";
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -230,7 +230,7 @@ export function KanbanBoard({ tasks, onComplete, onDelete }: KanbanBoardProps) {
                             {category}
                           </span>
                           <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                            {task.sync_status && <SyncStatusBadge status={task.sync_status} />}
+                            {task.sync_status && <SyncStatusBadge syncStatus={task.sync_status} />}
                           </div>
                         </div>
 

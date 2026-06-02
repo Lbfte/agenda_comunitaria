@@ -10,6 +10,7 @@ import {
   processOfflineQueue,
 } from '@/lib/sync-engine';
 import { getQueueSize, getCacheData, setCacheData } from '@/lib/local-storage';
+import { ADMIN_EMAIL, CACHE_TTL } from '@/lib/constants';
 import type { Task, InsertDTO, UpdateDTO } from '@/lib/database.types';
 
 type TaskFilter = {
@@ -24,6 +25,7 @@ export function useTasks(channel: 'geral' | 'pessoal', overrideTurmaId?: string)
   const { isOnline } = useNetworkStatus();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
 
   const userRef = useRef(user);
@@ -61,7 +63,7 @@ export function useTasks(channel: 'geral' | 'pessoal', overrideTurmaId?: string)
     const cacheKey = `tasks_${channel}_${filterKey}_${targetTurmaId}`;
     
     // SWR: Tentar cache primeiro para renderização imediata, mesmo online
-    const cached = getCacheData<Task[]>(cacheKey, 30 * 60 * 1000); // 30 min cache
+    const cached = getCacheData<Task[]>(cacheKey, CACHE_TTL.TASKS); // Usa TTL centralizado
     if (cached) {
       setTasks(cached);
       setLoading(false);
@@ -69,6 +71,7 @@ export function useTasks(channel: 'geral' | 'pessoal', overrideTurmaId?: string)
     } else {
       setLoading(true); // Só exibe spinner se não houver cache local
     }
+    setError(null);
 
     if (activeFetchRef.current) {
       activeFetchRef.current.abort();
@@ -90,7 +93,7 @@ export function useTasks(channel: 'geral' | 'pessoal', overrideTurmaId?: string)
         query = query.eq('type', 'turma');
         if (overrideTurmaId || currentProfile?.turma_id) {
           query = query.eq('turma_id', (overrideTurmaId || currentProfile?.turma_id) as string);
-        } else if (currentUser.email !== "morcegosnaodormem@gmail.com") {
+        } else if (currentUser.email !== ADMIN_EMAIL) {
           // Usuário normal sem turma não vê tarefas de turma
           query = query.eq('turma_id', '00000000-0000-0000-0000-000000000000');
         }
@@ -112,6 +115,7 @@ export function useTasks(channel: 'geral' | 'pessoal', overrideTurmaId?: string)
       if (error) {
         if (error.message?.includes('AbortError')) return; // Silenciar cancelamento intencional
         console.error('Erro ao buscar tarefas:', error.message);
+        setError('Não foi possível carregar as tarefas. Tente novamente mais tarde.');
       } else {
         setTasks(data || []);
         setCacheData(cacheKey, data || []);
@@ -119,6 +123,7 @@ export function useTasks(channel: 'geral' | 'pessoal', overrideTurmaId?: string)
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       console.error('Erro inesperado ao buscar tarefas:', err);
+      setError('Ocorreu um erro inesperado ao conectar com o servidor.');
     } finally {
       if (activeFetchRef.current === controller) {
         activeFetchRef.current = null;
@@ -301,6 +306,7 @@ export function useTasks(channel: 'geral' | 'pessoal', overrideTurmaId?: string)
   return {
     tasks,
     loading,
+    error,
     isOnline,
     pendingCount,
     fetchTasks,

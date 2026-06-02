@@ -71,7 +71,7 @@ export function useHistory(filterTurmaId?: string) {
 
     try {
       // Buscar histórico com perfil do autor
-      let query = supabase
+      let query = (supabase as any)
         .from('history')
         .select('*')
         .order('created_at', { ascending: false })
@@ -95,24 +95,24 @@ export function useHistory(filterTurmaId?: string) {
       }
 
       // Buscar perfis dos autores
-      const userIds = [...new Set((historyData || []).map((h) => h.user_id))];
-      const { data: profiles } = await supabase
+      const userIds = Array.from(new Set((historyData || []).map((h: any) => h.user_id)));
+      const { data: profiles } = await (supabase as any)
         .from('profiles')
         .select('id, full_name, initials, color')
         .in('id', userIds)
         .abortSignal(controller.signal);
 
       const profileMap = new Map(
-        (profiles || []).map((p) => [p.id, p])
+        (profiles || []).map((p: any) => [p.id, p])
       );
 
-      const enriched: HistoryEntryWithProfile[] = (historyData || []).map((h) => ({
+      const enriched: HistoryEntryWithProfile[] = (historyData || []).map((h: any) => ({
         ...h,
         profile: profileMap.get(h.user_id) || null,
       }));
 
       // Buscar menções do usuário
-      const { data: mentionData } = await supabase
+      const { data: mentionData } = await (supabase as any)
         .from('mentions')
         .select('*')
         .eq('mentioned_user_id', currentUser.id)
@@ -123,37 +123,37 @@ export function useHistory(filterTurmaId?: string) {
       let enrichedMentions: MentionWithContext[] = [];
 
       if (mentionData && mentionData.length > 0) {
-        const historyIds = mentionData.map((m) => m.history_id);
-        const { data: relatedHistory } = await supabase
+        const historyIds = mentionData.map((m: any) => m.history_id);
+        const { data: relatedHistory } = await (supabase as any)
           .from('history')
           .select('*')
           .in('id', historyIds)
           .abortSignal(controller.signal);
 
         const histMap = new Map(
-          (relatedHistory || []).map((h) => [h.id, h])
+          (relatedHistory || []).map((h: any) => [h.id, h])
         );
 
         // Buscar perfis dos mencionadores
-        const mentionerIds = [...new Set(
-          (relatedHistory || []).map((h) => h.user_id)
-        )];
-        const { data: mentionerProfiles } = await supabase
+        const mentionerIds = Array.from(new Set(
+          (relatedHistory || []).map((h: any) => h.user_id)
+        ));
+        const { data: mentionerProfiles } = await (supabase as any)
           .from('profiles')
           .select('id, full_name, initials, color')
           .in('id', mentionerIds)
           .abortSignal(controller.signal);
 
         const mentionerMap = new Map(
-          (mentionerProfiles || []).map((p) => [p.id, p])
+          (mentionerProfiles || []).map((p: any) => [p.id, p])
         );
 
-        enrichedMentions = mentionData.map((m) => {
+        enrichedMentions = mentionData.map((m: any) => {
           const hist = histMap.get(m.history_id);
           return {
             ...m,
             history: hist || null,
-            mentioner: hist ? mentionerMap.get(hist.user_id) || null : null,
+            mentioner: hist ? mentionerMap.get((hist as any).user_id) || null : null,
           };
         });
       }

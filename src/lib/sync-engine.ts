@@ -1,4 +1,5 @@
-import { supabase } from './supabase';
+import { supabase as rawSupabase } from './supabase';
+const supabase = rawSupabase as any;
 import {
   getOfflineQueue,
   removeFromOfflineQueue,
@@ -44,7 +45,7 @@ export async function syncCreateTask(
   // Online: enviar para Supabase
   const { data, error } = await supabase
     .from('tasks')
-    .insert({ ...task, sync_status: 'synced' })
+    .insert({ ...task, sync_status: 'synced' } as any)
     .select('id, title, due_date, due_time')
     .single();
 
@@ -69,7 +70,7 @@ export async function syncCreateTask(
       if (gcalResult?.id) {
         supabase
           .from('tasks')
-          .update({ google_calendar_event_id: gcalResult.id })
+          .update({ google_calendar_event_id: gcalResult.id } as any)
           .eq('id', data.id)
           .then(); // Ignorar promessa para não bloquear
       }
@@ -77,7 +78,7 @@ export async function syncCreateTask(
   }
 
   // Registrar no histórico
-  await supabase.from('history').insert({
+  await (supabase as any).from('history').insert({
     turma_id: task.turma_id || null,
     user_id: task.created_by,
     action: 'add',
@@ -108,7 +109,7 @@ export async function syncUpdateTask(
 
   const { error } = await supabase
     .from('tasks')
-    .update({ ...updates, sync_status: 'synced' })
+    .update({ ...updates, sync_status: 'synced' } as any)
     .eq('id', taskId);
 
   if (error) {
@@ -130,7 +131,7 @@ export async function syncUpdateTask(
   }
 
   // Registrar no histórico
-  await supabase.from('history').insert({
+  await (supabase as any).from('history').insert({
     turma_id: turmaId || null,
     user_id: userId,
     action: 'edit',
@@ -162,7 +163,7 @@ export async function syncCompleteTask(
 
   const { error } = await supabase
     .from('tasks')
-    .update({ completed: true, completed_at: completedAt, sync_status: 'synced' })
+    .update({ completed: true, completed_at: completedAt, sync_status: 'synced' } as any)
     .eq('id', taskId);
 
   if (error) {
@@ -174,7 +175,7 @@ export async function syncCompleteTask(
     return { success: false, syncStatus: 'local', error: error.message };
   }
 
-  await supabase.from('history').insert({
+  await (supabase as any).from('history').insert({
     turma_id: turmaId || null,
     user_id: userId,
     action: 'complete',
@@ -217,7 +218,7 @@ export async function syncDeleteTask(
     await deleteCalendarEvent(googleEventId);
   }
 
-  await supabase.from('history').insert({
+  await (supabase as any).from('history').insert({
     turma_id: turmaId || null,
     user_id: userId,
     action: 'delete',
@@ -261,7 +262,7 @@ async function processOperation(op: OfflineOperation): Promise<boolean> {
       const { id: _localId, ...taskData } = payload;
       const { data, error } = await supabase
         .from('tasks')
-        .insert({ ...taskData, sync_status: 'synced' } as InsertDTO<'tasks'>)
+        .insert({ ...taskData, sync_status: 'synced' } as any)
         .select('id, title, due_date, due_time')
         .single();
 
@@ -280,7 +281,7 @@ async function processOperation(op: OfflineOperation): Promise<boolean> {
           if (gcalResult?.id) {
             supabase
               .from('tasks')
-              .update({ google_calendar_event_id: gcalResult.id })
+              .update({ google_calendar_event_id: gcalResult.id } as any)
               .eq('id', data.id)
               .then();
           }
@@ -293,7 +294,7 @@ async function processOperation(op: OfflineOperation): Promise<boolean> {
       const { id, ...updates } = payload;
       const { error } = await supabase
         .from('tasks')
-        .update({ ...updates, sync_status: 'synced' })
+        .update({ ...updates, sync_status: 'synced' } as any)
         .eq('id', id as string);
       return !error;
     }
@@ -302,7 +303,7 @@ async function processOperation(op: OfflineOperation): Promise<boolean> {
       const { id, ...updates } = payload;
       const { error } = await supabase
         .from('tasks')
-        .update({ ...updates, sync_status: 'synced' })
+        .update({ ...updates, sync_status: 'synced' } as any)
         .eq('id', id as string);
       return !error;
     }
@@ -324,7 +325,7 @@ async function processOperation(op: OfflineOperation): Promise<boolean> {
  * Sincroniza em lote todas as tarefas ativas com o Google Calendar do usuário.
  * 1. Processa operações pendentes da fila offline (sincronizando criações e deleções).
  * 2. Identifica tarefas ativas no Supabase que não possuem ID do Google Calendar.
- * 3. Envia cada uma para o calendário e atualiza o respectivo ID no Supabase.
+ * 3. Envia cada uma para o calendário e atualiza o respectivo ID no (supabase as any).
  */
 export async function syncAllWithGoogleCalendar(userId: string): Promise<{ success: boolean; syncedCount: number; error?: string }> {
   try {
@@ -351,7 +352,7 @@ export async function syncAllWithGoogleCalendar(userId: string): Promise<{ succe
   }
 
   // 3. Filtrar apenas as tarefas que ainda não estão integradas com o Google Calendar
-  const pendingTasks = tasks.filter(t => !t.google_calendar_event_id);
+  const pendingTasks = tasks.filter((t: any) => !t.google_calendar_event_id);
 
   if (pendingTasks.length === 0) {
     return { success: true, syncedCount: 0 };
@@ -372,7 +373,7 @@ export async function syncAllWithGoogleCalendar(userId: string): Promise<{ succe
       if (gcalResult?.id) {
         const { error: updateError } = await supabase
           .from('tasks')
-          .update({ google_calendar_event_id: gcalResult.id })
+          .update({ google_calendar_event_id: gcalResult.id } as any)
           .eq('id', task.id);
 
         if (!updateError) {

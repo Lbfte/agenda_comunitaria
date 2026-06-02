@@ -4,20 +4,20 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Hash, Lock, AlertCircle } from "lucide-react";
 import { useMessages } from "../hooks/useMessages";
 import { useAuth } from "../contexts/AuthContext";
+import { USER_COLORS, ADMIN_EMAIL } from "@/lib/constants";
+import { supabase } from "@/lib/supabase";
 
 const userColors: Record<string, string> = {};
-const colorPalette = ["#E85D5D", "#5B8DEF", "#E8C84A", "#7A8F6B", "#C77DFF", "#FF8C42", "#6ECFBD"];
 let colorIndex = 0;
 
 function getUserColor(name: string): string {
   if (!userColors[name]) {
-    userColors[name] = colorPalette[colorIndex % colorPalette.length];
+    userColors[name] = USER_COLORS[colorIndex % USER_COLORS.length];
     colorIndex++;
   }
   return userColors[name];
 }
 
-import { supabase } from "@/lib/supabase";
 
 export function Social() {
   const [channel, setChannel] = useState<"class" | "private">("class");
@@ -25,7 +25,7 @@ export function Social() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { user, profile } = useAuth();
-  const isAdmin = user?.email === "morcegosnaodormem@gmail.com";
+  const isAdmin = user?.email === ADMIN_EMAIL;
   
   const [adminTurmas, setAdminTurmas] = useState<{ id: string; name: string }[]>([]);
   const [selectedAdminTurmaId, setSelectedAdminTurmaId] = useState<string>("");
@@ -34,11 +34,11 @@ export function Social() {
   // Buscar turmas para o admin (todas as turmas do sistema)
   useEffect(() => {
     if (isAdmin && user) {
-      supabase
+      (supabase as any)
         .from("turmas")
         .select("id, name")
         .order("name", { ascending: true })
-        .then(({ data }) => {
+        .then(({ data }: { data: any[] }) => {
           if (data && data.length > 0) {
             setAdminTurmas(data);
             setSelectedAdminTurmaId(data[0].id);
@@ -48,18 +48,18 @@ export function Social() {
   }, [isAdmin, user]);
 
   const activeTurmaId = isAdmin ? selectedAdminTurmaId : profile?.turma_id;
-  const { messages, loading, sendMessage } = useMessages(channel, activeTurmaId);
+  const { messages, loading, error, sendMessage, refresh } = useMessages(channel, activeTurmaId || undefined);
 
   // Buscar IDs dos admins da turma ativa para mostrar badge "Administrador"
   useEffect(() => {
     if (!activeTurmaId || channel !== "class") return;
     
-    supabase
+    (supabase as any)
       .from("turma_members")
       .select("user_id")
       .eq("turma_id", activeTurmaId)
       .eq("role", "admin")
-      .then(({ data }) => {
+      .then(({ data }: { data: any[] }) => {
         if (data) {
           setAdminUserIds(new Set(data.map((d) => d.user_id)));
         }
@@ -78,7 +78,7 @@ export function Social() {
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    await sendMessage(input, activeTurmaId);
+    await sendMessage(input, activeTurmaId || undefined);
     setInput("");
   };
 
@@ -174,11 +174,21 @@ export function Social() {
           </div>
         )}
       </div>
+      
       <div className="mx-4 h-[1px] bg-[#222]/80 mb-3" />
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-auto px-6 lg:px-12 space-y-3 mb-3">
-        <div className="max-w-[720px] mx-auto space-y-3">
+      <div className="flex-1 flex flex-col bg-zinc-900/30 rounded-2xl border border-white/[0.04] overflow-hidden relative shadow-lg shadow-black/10">
+        
+        {error && (
+          <div className="m-4 p-4 rounded-xl border border-red-500/20 bg-red-500/10 flex items-center gap-3">
+            <AlertCircle className="text-red-500 shrink-0" size={18} />
+            <p className="text-[13px] text-red-200">{error}</p>
+          </div>
+        )}
+
+        <div ref={scrollRef} className="flex-1 overflow-auto px-6 lg:px-12 space-y-3 mb-3 py-4">
+          <div className="max-w-[720px] mx-auto space-y-3">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="w-6 h-6 border-2 border-[#222] border-t-[#7A8F6B] rounded-full animate-spin" />
@@ -259,6 +269,7 @@ export function Social() {
             ))
           )}
         </div>
+      </div>
       </div>
 
       {/* Input */}

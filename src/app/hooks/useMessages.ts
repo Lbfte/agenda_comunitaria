@@ -12,6 +12,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<MessageWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const profileCache = useRef(new Map<string, Pick<Profile, 'full_name' | 'initials' | 'color'>>());
 
   const userRef = useRef(user);
@@ -38,13 +39,13 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
       .filter((id) => !profileCache.current.has(id));
 
     if (missingIds.length > 0) {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await (supabase as any)
         .from('profiles')
         .select('id, full_name, initials, color')
         .in('id', missingIds);
 
       (profiles || []).forEach((p: any) => {
-        profileCache.current.set(p.id, p);
+        profileCache.current.set(p.id, p as Pick<Profile, 'full_name' | 'initials' | 'color'>);
       });
     }
 
@@ -106,7 +107,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
     activeFetchRef.current = controller;
 
     try {
-      let query = supabase
+      let query = (supabase as any)
         .from('messages')
         .select('*')
         .eq('channel', 'class')
@@ -126,6 +127,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
 
       if (error) {
         console.error('Erro ao buscar mensagens:', error.message);
+        setError('Não foi possível carregar as mensagens. Tente novamente mais tarde.');
       } else {
         const enriched = await enrichMessages(data || []);
         setMessages(enriched);
@@ -134,6 +136,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       console.error('Erro inesperado ao buscar mensagens:', err);
+      setError('Ocorreu um erro inesperado ao conectar com o servidor.');
     } finally {
       if (activeFetchRef.current === controller) {
         activeFetchRef.current = null;
@@ -200,14 +203,14 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
     const enriched = await enrichMessages([optimisticMsg]);
     setMessages((prev) => [...prev, ...enriched]);
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('messages')
       .insert({
         user_id: currentUser.id,
         channel,
         text: text.trim(),
-        turma_id: channel === 'class' ? activeTurmaId : undefined,
-      } as any)
+        turma_id: channel === 'class' ? (activeTurmaId || null) : null,
+      })
       .select()
       .single();
 
@@ -218,8 +221,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
       return null;
     }
     
-    // Substituir o ID temporário pelo ID real do banco
-    setMessages((prev) => prev.map(m => m.id === tempId ? { ...m, ...(data as any), isSelf: true } : m));
+    setMessages((prev) => prev.map(m => m.id === tempId ? { ...m, ...data, isSelf: true } : m));
 
     return data;
   }, [channel, enrichMessages]);
@@ -268,6 +270,7 @@ export function useMessages(channel: 'class' | 'private', turmaId?: string) {
   return {
     messages,
     loading,
+    error,
     sendMessage,
     refresh: fetchMessages,
   };

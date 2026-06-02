@@ -21,6 +21,9 @@
 
 **Admin global:** `morcegosnaodormem@gmail.com` — tem acesso exclusivo à aba de solicitações e ao monitoramento de todas as turmas.
 
+### Nota sobre Tipagem (Supabase)
+Devido a limitações na geração automática de tipos do Supabase (`database.types.ts`) ao lidar com campos relacionais opcionais e selects parciais, foi adotada a convenção de utilizar casting `(supabase as any)` ou `as any` nos métodos `.insert()` e `.update()` em contextos onde o compilador acusa tipo `never` incorretamente. Isso previne falhas impeditivas na build de produção do Next.js.
+
 ---
 
 ## Raiz do Projeto
@@ -64,6 +67,7 @@
 | Arquivo | Responsabilidade |
 |---|---|
 | `supabase.ts` | Instância singleton do cliente Supabase (`createClient`). Lê variáveis `NEXT_PUBLIC_SUPABASE_*`. Configura auto-refresh de token, persistência de sessão e detecção de OAuth callback na URL. |
+| `env.ts` | Validação estrita (fail-fast) das variáveis de ambiente usando `process.env`. Lança erro se `NEXT_PUBLIC_SUPABASE_URL` ou `NEXT_PUBLIC_SUPABASE_ANON_KEY` não existirem. |
 | `database.types.ts` | Tipos TypeScript gerados a partir do schema do Supabase. Define interfaces para todas as tabelas (`turmas`, `profiles`, `tasks`, `flashcards`, `flashcard_folders`, `messages`, `history`, `mentions`, `turma_members`, `turma_requests`). Exporta type helpers: `Tables<T>`, `InsertDTO<T>`, `UpdateDTO<T>` e aliases (`Task`, `Profile`, `Flashcard`, etc.). |
 | `local-storage.ts` | Fila de operações offline (`OfflineOperation`) persistida no `localStorage`. Funções para adicionar, remover e processar a fila. Também gerencia um cache local genérico com TTL (`setCacheData`, `getCacheData`, `clearCache`). |
 | `sync-engine.ts` | **Motor de sincronização principal.** Gerencia CRUD de tarefas com lógica online/offline. Se online → persiste no Supabase + tenta criar evento no Google Calendar (fire-and-forget) + registra no histórico. Se offline → enfileira no `localStorage`. Processa a fila automaticamente ao reconectar (`processOfflineQueue`). Inclui `syncAllWithGoogleCalendar` para sincronização em lote. |
@@ -102,15 +106,15 @@
 
 ## /src/app/components — Componentes React
 
-### Navegação e Layout
+### Navegação e Layout (`/layout`)
 
 | Componente | Responsabilidade |
 |---|---|
-| `Sidebar.tsx` | Barra lateral de navegação (visível em `md+`). Mostra logo, links de navegação com indicador ativo, avatar/nome do usuário, nome da turma e botão de logout. Adiciona link "Solicitações" se o usuário for admin. |
-| `BottomNav.tsx` | Navegação inferior móvel (visível apenas em telas `< md`). Pill com 5 ícones + pill separada para notificações com badge contador. |
-| `PageHeader.tsx` | Header reutilizável com logo (mobile) e toggle de abas `Pessoal`/`Geral`. Usado por `Tasks`, `StudyHub` e `History`. |
-| `AppLogo.tsx` | Componente SVG do logo da aplicação (3 quadrados coloridos: amarelo, cinza e verde). Aceita prop `size`. |
-| `SplashScreen.tsx` | Tela de splash animada com 3 quadrados que aparecem em sequência (400ms cada) + texto "Agenda da Turma". Auto-dismiss após 2s. Se a carga demorar mais que 4s, exibe um botão de emergência para limpar cookies/localStorage e recarregar o app. |
+| `layout/Sidebar.tsx` | Barra lateral de navegação (visível em `md+`). Mostra logo, links de navegação com indicador ativo, avatar/nome do usuário, nome da turma e botão de logout. Adiciona link "Solicitações" se o usuário for admin. |
+| `layout/BottomNav.tsx` | Navegação inferior móvel (visível apenas em telas `< md`). Pill com 5 ícones + pill separada para notificações com badge contador. |
+| `layout/PageHeader.tsx` | Header reutilizável com logo (mobile) e toggle de abas `Pessoal`/`Geral`. Usado por `Tasks` e `History`. |
+| `layout/AppLogo.tsx` | Componente SVG do logo da aplicação (3 quadrados coloridos: amarelo, cinza e verde). Aceita prop `size`. |
+| `layout/SplashScreen.tsx` | Tela de splash animada com 3 quadrados que aparecem em sequência (400ms cada) + texto "Agenda da Turma". Auto-dismiss após 2s. Se a carga demorar mais que 4s, exibe um botão de emergência para limpar cookies/localStorage e recarregar o app. |
 
 ### Autenticação
 
@@ -130,14 +134,18 @@
 | `Turmas.tsx` | **Gerenciamento de turmas.** Busca textual de turmas, solicitação de entrada, criação de novas turmas (com código de convite), botão de sair da turma, onboarding para usuários sem turma. |
 | `AdminRequests.tsx` | **Painel administrativo.** Lista solicitações pendentes de entrada em turmas com perfil do aluno, data e turma alvo. Ações: Aprovar (atualiza perfil + insere em `turma_members` + deleta request) ou Rejeitar (deleta request). Escuta em tempo real via Realtime. |
 
-### Componentes de Suporte
+### Componentes de Suporte e Compartilhados (`/shared` e `/modals`)
 
 | Componente | Responsabilidade |
 |---|---|
 | `CalendarGrid.tsx` | Grade de calendário mensal interativo. Navegação entre meses, destaque do dia atual (sublinhado verde), seleção animada com `layoutId`, pontinhos coloridos por categoria de tarefa em cada dia. |
 | `KanbanBoard.tsx` | Board Kanban cronológico para tarefas. Agrupa em colunas: Atrasadas → Datas futuras (Hoje, Amanhã, etc.) → Sem Data. Cards com indicador de prioridade lateral, badge de sync status, botões de completar/excluir. Ordenação por cor de categoria + horário. |
-| `TaskCreateModal.tsx` | Modal de criação/edição de tarefas. Campos: título, descrição, data, horário, período (manhã/tarde/noite), marcador (triângulo/invertido) e cor da categoria. Exporta o tipo `TaskFormData`. |
-| `SyncStatusBadge.tsx` | Badge visual de status de sincronização. Modo global: Online (verde) / Offline (vermelho) + contagem pendente (amarelo). Modo inline: badges individuais por item (`synced`/`pending`/`local`). |
+| `modals/TaskCreateModal.tsx` | Modal de criação/edição de tarefas. Campos: título, descrição, data, horário, período (manhã/tarde/noite), marcador (triângulo/invertido) e cor da categoria. Exporta o tipo `TaskFormData`. |
+| `shared/SyncStatusBadge.tsx` | Badge visual de status de sincronização. Modo global: Online (verde) / Offline (vermelho) + contagem pendente (amarelo). Modo inline: badges individuais por item (`synced`/`pending`/`local`). |
+| `shared/TaskCard.tsx` / `TaskRow.tsx` | Componentes de renderização de tarefas extraídos para melhor performance (lista e grid). |
+| `shared/GCalSyncButton.tsx` | Botão padronizado para iniciar sincronização com o Google Calendar. |
+| `shared/SyncNotification.tsx` | Notificação flutuante de feedback de sincronização (sucesso/erro). |
+| `shared/CategoryFilter.tsx` | Filtros visuais reaproveitáveis de categoria (`todos`, `provas`, etc.). |
 
 ---
 
@@ -150,6 +158,8 @@
 | `useMessages.ts` | Hook de chat/mensagens. Fetch com cache SWR, envio otimista, cache de perfis de usuários, subscrição Realtime para mensagens novas (evita duplicatas), abort de fetches. Aceita canal (`class`/`private`) e `turmaId`. Se for canal privado, opera de forma 100% local em `localStorage` para notas pessoais totalmente offline. |
 | `useHistory.ts` | Hook de histórico de atividades. Busca entradas com perfis enriquecidos, menções ao usuário com contexto, cache SWR, subscrição Realtime para novas entradas. |
 | `useNetworkStatus.ts` | Hook simples de monitoramento de rede. Retorna `{ isOnline }` reativo via `navigator.onLine` + event listeners `online`/`offline`. |
+| `useGoogleCalendarSync.ts` | Extraído para desacoplar a lógica de integração de UI (invoca `syncAllWithGoogleCalendar`). |
+| `useViewTurma.ts` | Extraído para controlar a identificação e persistência do ID da turma ativa nos componentes Dashboard e Tasks. |
 
 ---
 
@@ -167,7 +177,6 @@ layout.tsx
     └── [page].tsx → [Componente principal]
           ├── Dashboard.tsx → useTasks, useLocalReminders, CalendarGrid, SyncStatusBadge, sync-engine, notifications
           ├── Tasks.tsx → useTasks, KanbanBoard, TaskCreateModal, SyncStatusBadge, sync-engine
-          ├── StudyHub.tsx → useFlashcards, FlashcardFolderModal, FlashcardEditModal, spaced-repetition
           ├── Social.tsx → useMessages
          ├── History.tsx → useHistory
          ├── Turmas.tsx → supabase (direto)

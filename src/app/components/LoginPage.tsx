@@ -19,7 +19,7 @@ export function LoginPage() {
   useEffect(() => {
     async function loadTurmas() {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("turmas")
           .select("id, name")
           .order("name", { ascending: true });

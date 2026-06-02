@@ -2,20 +2,26 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "./PageHeader";
-import { X, Calendar, RefreshCw, CheckCircle2, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { PageHeader } from "./layout/PageHeader";
+import { X, Calendar, RefreshCw, CheckCircle2, ChevronRight, SlidersHorizontal, AlertCircle } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
-import { SyncStatusBadge } from "./SyncStatusBadge";
+import { SyncStatusBadge } from "./shared/SyncStatusBadge";
 import { getQueueSize } from "@/lib/local-storage";
 import { useTasks } from "../hooks/useTasks";
 import { useLocalReminders } from "../hooks/useLocalReminders";
 import { checkDeadlineAlerts } from "@/lib/notifications";
 import { CalendarGrid } from "./CalendarGrid";
-import { TaskCreateModal, type TaskFormData } from "./TaskCreateModal";
+import { TaskCreateModal, type TaskFormData } from "./modals/TaskCreateModal";
 import { syncAllWithGoogleCalendar } from "@/lib/sync-engine";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
+import { ADMIN_EMAIL, PERIOD_FILTERS, CATEGORY_COLORS } from "@/lib/constants";
+import { useGoogleCalendarSync } from "../hooks/useGoogleCalendarSync";
+import { useViewTurma } from "../hooks/useViewTurma";
+import { GCalSyncButton } from "./shared/GCalSyncButton";
+import { SyncNotification } from "./shared/SyncNotification";
+import { CategoryFilter } from "./shared/CategoryFilter";
 
 // Mocks de lembretes removidos. Usando tarefas do canal pessoal.
 
@@ -25,7 +31,12 @@ export function Dashboard() {
   const { isOnline } = useNetworkStatus();
   const firstName = profile?.full_name?.split(' ')[0] || 'Usuário';
   const [tab, setTab] = useState<"geral" | "pessoal">("pessoal");
-  const [turmaName, setTurmaName] = useState<string>("");
+
+  // Hook de Sincronização GCal
+  const { syncingGCal, syncMessage, handleSyncGCal } = useGoogleCalendarSync(user?.id);
+
+  // Hook de Turma Ativa
+  const { viewTurmaId, setViewTurmaId, activeTurmaName } = useViewTurma(profile?.turma_id);
 
   // Inicializar aba baseada na presença de turma
   useEffect(() => {
@@ -33,20 +44,6 @@ export function Dashboard() {
       setTab("geral");
     } else {
       setTab("pessoal");
-    }
-  }, [profile?.turma_id]);
-
-  // Carregar nome da turma dinamicamente
-  useEffect(() => {
-    if (profile?.turma_id) {
-      supabase
-        .from("turmas")
-        .select("name")
-        .eq("id", profile.turma_id)
-        .single()
-        .then(({ data }) => {
-          if (data) setTurmaName((data as any).name);
-        });
     }
   }, [profile?.turma_id]);
 
@@ -68,27 +65,14 @@ export function Dashboard() {
   };
 
   // Novos Filtros Inteligentes
-  const [categoryFilter, setCategoryFilter] = useState<"todos" | "provas" | "trabalhos" | "atividades" | "avisos">("todos");
-  const [periodFilter, setPeriodFilter] = useState<"todos" | "manha" | "tarde" | "noite">("todos");
-
-  // Estado para Sincronização Google Calendar
-  const [syncingGCal, setSyncingGCal] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string>("todos");
+  const [periodFilter, setPeriodFilter] = useState<string>("todos");
 
   // Estado para o modal de criação de tarefa via calendário
   const [calendarTaskDate, setCalendarTaskDate] = useState<string | null>(null);
 
-  // Controle local de visualização da Turma (para usuários com > 1 turma)
-  const [viewTurmaId, setViewTurmaId] = useState<string>("");
-
-  useEffect(() => {
-    if (profile?.turma_id && !viewTurmaId) {
-      setViewTurmaId(profile.turma_id);
-    }
-  }, [profile?.turma_id, viewTurmaId]);
-
   // Tasks data for deadline alerts e visualização
-  const { tasks, createTask } = useTasks(tab, viewTurmaId || undefined);
+  const { tasks, createTask, error: tasksError } = useTasks(tab, viewTurmaId || undefined);
   const { createTask: createGeralTask } = useTasks("geral", viewTurmaId || undefined);
   const { reminders, addReminder } = useLocalReminders();
   const tasksRef = useRef(tasks);
@@ -108,10 +92,10 @@ export function Dashboard() {
   const filteredTasks = tasks.filter(task => {
     // 1. Filtrar por categoria (mapeado por cor)
     if (categoryFilter !== "todos") {
-      if (categoryFilter === "provas" && task.shape_color !== "#E85D5D") return false;
-      if (categoryFilter === "trabalhos" && task.shape_color !== "#E8C84A") return false;
-      if (categoryFilter === "atividades" && task.shape_color !== "#7A8F6B") return false;
-      if (categoryFilter === "avisos" && task.shape_color !== "#5B8DEF" && task.shape_color !== "#C77DFF" && task.shape_color !== "#666") return false;
+      if (categoryFilter === "provas" && task.shape_color !== CATEGORY_COLORS.provas) return false;
+      if (categoryFilter === "trabalhos" && task.shape_color !== CATEGORY_COLORS.trabalhos) return false;
+      if (categoryFilter === "atividades" && task.shape_color !== CATEGORY_COLORS.atividades) return false;
+      if (categoryFilter === "avisos" && !CATEGORY_COLORS.avisos.includes(task.shape_color as any)) return false;
     }
     // 2. Filtrar por período
     if (periodFilter !== "todos" && task.period !== periodFilter) return false;
@@ -125,35 +109,9 @@ export function Dashboard() {
     setSelectedDay(1); // Mudar para o dia 1 do novo mês para evitar bugs de data
   };
 
-  // Manipular Integração com Google Calendar
-  const handleSyncGCal = async () => {
-    if (!user) return;
-    setSyncingGCal(true);
-    setSyncMessage(null);
-
-    try {
-      const result = await syncAllWithGoogleCalendar(user.id);
-      if (result.success) {
-        setSyncMessage(`Agenda integrada! ${result.syncedCount} evento(s) adicionado(s)/removido(s).`);
-        setTimeout(() => setSyncMessage(null), 5000);
-      } else {
-        setSyncMessage(`Erro de sincronização: ${result.error || "Tente novamente."}`);
-        setTimeout(() => setSyncMessage(null), 5000);
-      }
-    } catch (err) {
-      console.error(err);
-      setSyncMessage("Erro inesperado na conexão com o Google.");
-      setTimeout(() => setSyncMessage(null), 5000);
-    } finally {
-      setSyncingGCal(false);
-    }
-  };
-
-  const activeTurmaName = userTurmas?.find(t => t.id === viewTurmaId)?.name || turmaName;
-
   return (
     <div className="flex-1 flex flex-col pb-24 md:pb-6 overflow-auto">
-      <PageHeader tab={tab} onTabChange={setTab} viewTurmaId={viewTurmaId} setViewTurmaId={setViewTurmaId} hideGeral={!profile?.turma_id} />
+      <PageHeader tab={tab} onTabChange={setTab} viewTurmaId={viewTurmaId || undefined} setViewTurmaId={setViewTurmaId} hideGeral={!profile?.turma_id} />
 
       {/* ─── Greeting + Sync ─── */}
       <div className="px-7 mb-5">
@@ -163,54 +121,34 @@ export function Dashboard() {
             <p className="text-[13px] text-zinc-500 font-light">
               {profile?.turma_id 
                 ? `você está na turma "${activeTurmaName || 'Carregando...'}"`
-                : user?.email === "morcegosnaodormem@gmail.com"
+                : user?.email === ADMIN_EMAIL
                   ? "Painel do Administrador Geral"
                   : "Canal Pessoal (sem turma conectada)"}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {/* Botão de Integração Google Calendar */}
-            <button
-              onClick={handleSyncGCal}
-              disabled={syncingGCal}
-              className={`h-9 px-3.5 rounded-xl text-[12px] font-semibold flex items-center gap-2 border transition-all select-none ${
-                syncingGCal
-                  ? "bg-zinc-800 border-zinc-700 text-zinc-400 cursor-not-allowed"
-                  : "bg-[#7A8F6B]/10 border-[#7A8F6B]/20 text-[#9EBF8A] hover:bg-[#7A8F6B]/25 hover:border-[#7A8F6B]/30 active:scale-95 cursor-pointer"
-              }`}
-            >
-              {syncingGCal ? (
-                <RefreshCw size={14} className="animate-spin text-[#9EBF8A]" />
-              ) : (
-                <Calendar size={14} className="text-[#9EBF8A]" />
-              )}
-              <span>{syncingGCal ? "Integrando..." : "Integrar Google Calendar"}</span>
-            </button>
+            {/* Sync GCal Status */}
+            <GCalSyncButton onSync={handleSyncGCal} isSyncing={syncingGCal} />
 
             <SyncStatusBadge isOnline={isOnline} pendingCount={getQueueSize()} />
           </div>
         </div>
 
-        {/* Notificação da Sincronização Google Calendar */}
-        <AnimatePresence>
-          {syncMessage && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="mt-3 p-3 rounded-xl border border-white/[0.06] bg-zinc-950/80 text-[12px] text-zinc-300 flex items-center gap-2 shadow-lg backdrop-blur-sm"
-            >
-              <CheckCircle2 size={14} className="text-[#9EBF8A] shrink-0" />
-              <span>{syncMessage}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <SyncNotification message={syncMessage} />
       </div>
 
       {/* Separator */}
       <div className="mx-7 h-[1px] bg-white/[0.04] mb-5 hidden lg:block" />
 
       {/* ─── Grid Principal: Calendário + Lembretes ─── */}
+      <div className="lg:px-7 mb-4">
+        {tasksError && (
+          <div className="mb-4 p-4 rounded-xl border border-red-500/20 bg-red-500/10 flex items-center gap-3">
+            <AlertCircle className="text-red-500 shrink-0" size={18} />
+            <p className="text-[13px] text-red-200">{tasksError}</p>
+          </div>
+        )}
+      </div>
       <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-8 lg:px-7">
         
         {/* ─── Coluna Esquerda: Filtros + Calendário ─── */}
@@ -236,39 +174,16 @@ export function Dashboard() {
               {/* Filtro por Categorias */}
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[11px] text-zinc-500 font-medium mr-1.5 uppercase tracking-wider">Tipos:</span>
-                {[
-                  { id: "todos", label: "Tudo", color: "border-zinc-700 text-zinc-300" },
-                  { id: "provas", label: "Provas 🔴", color: "border-red-500/20 text-red-400 hover:bg-red-500/5" },
-                  { id: "trabalhos", label: "Trabalhos 🟡", color: "border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/5" },
-                  { id: "atividades", label: "Atividades 🟢", color: "border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/5" },
-                  { id: "avisos", label: "Avisos 🔵", color: "border-blue-500/20 text-blue-400 hover:bg-blue-500/5" }
-                ].map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => setCategoryFilter(c.id as any)}
-                    className={`h-7 px-3 rounded-full text-[11px] font-medium border select-none transition-all active:scale-95 ${
-                      categoryFilter === c.id
-                        ? "bg-[#7A8F6B] border-[#7A8F6B] text-zinc-950 font-semibold"
-                        : `bg-white/[0.02] ${c.color}`
-                    }`}
-                  >
-                    {c.label}
-                  </button>
-                ))}
+                <CategoryFilter currentFilter={categoryFilter} onFilterChange={setCategoryFilter} variant="dashboard" />
               </div>
 
               {/* Filtro por Período */}
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[11px] text-zinc-500 font-medium mr-1.5 uppercase tracking-wider">Turno:</span>
-                {[
-                  { id: "todos", label: "Todos" },
-                  { id: "manha", label: "Manhã" },
-                  { id: "tarde", label: "Tarde" },
-                  { id: "noite", label: "Noite" }
-                ].map(p => (
+                {PERIOD_FILTERS.map(p => (
                   <button
                     key={p.id}
-                    onClick={() => setPeriodFilter(p.id as any)}
+                    onClick={() => setPeriodFilter(p.id)}
                     className={`h-7 px-3 rounded-full text-[11px] font-medium border select-none transition-all active:scale-95 ${
                       periodFilter === p.id
                         ? "bg-zinc-300 border-zinc-300 text-zinc-950 font-semibold"

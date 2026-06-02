@@ -1,19 +1,26 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { PageHeader } from "./PageHeader";
+import { PageHeader } from "./layout/PageHeader";
 import {
   Search, Check, Trash2, Plus, SlidersHorizontal, List, Grid,
   Calendar, RefreshCw, CheckCircle2, ChevronDown, AlertCircle,
   HelpCircle, Clock
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { useTasks } from "../hooks/useTasks";
-import { SyncStatusBadge } from "./SyncStatusBadge";
-import { TaskCreateModal, type TaskFormData } from "./TaskCreateModal";
-import { syncAllWithGoogleCalendar } from "@/lib/sync-engine";
 import { motion, AnimatePresence } from "motion/react";
 import { KanbanBoard } from "./KanbanBoard";
+import { CATEGORY_FILTERS, CATEGORY_COLORS } from "@/lib/constants";
+import { useGoogleCalendarSync } from "../hooks/useGoogleCalendarSync";
+import { useViewTurma } from "../hooks/useViewTurma";
+import { GCalSyncButton } from "./shared/GCalSyncButton";
+import { SyncNotification } from "./shared/SyncNotification";
+import { CategoryFilter } from "./shared/CategoryFilter";
+import { TaskRow } from "./shared/TaskRow";
+import { TaskCard } from "./shared/TaskCard";
+import { SyncStatusBadge } from "./shared/SyncStatusBadge";
+import { TaskCreateModal, type TaskFormData } from "./modals/TaskCreateModal";
+import { useTasks } from "../hooks/useTasks";
 
 export function Tasks() {
   const [tab, setTab] = useState<"geral" | "pessoal">("pessoal");
@@ -21,40 +28,26 @@ export function Tasks() {
   const { user, profile, userTurmas } = useAuth();
   const firstName = profile?.full_name?.split(" ")[0] || "Usuário";
 
-  useEffect(() => {
-    if (profile?.turma_id) {
-      setTab("geral");
-    } else {
-      setTab("pessoal");
-    }
-  }, [profile?.turma_id]);
+  // Hook de Sincronização GCal
+  const { syncingGCal, syncMessage, handleSyncGCal } = useGoogleCalendarSync(user?.id, () => fetchTasks());
 
-  // Controle local de visualização da Turma (para usuários com > 1 turma)
-  const [viewTurmaId, setViewTurmaId] = useState<string>("");
+  // Hook de Turma Ativa
+  const { viewTurmaId, setViewTurmaId, activeTurmaName } = useViewTurma(profile?.turma_id, () => {
+    if (tab === "geral") setTab("pessoal");
+  });
 
-  useEffect(() => {
-    if (profile?.turma_id && !viewTurmaId) {
-      setViewTurmaId(profile.turma_id);
-    }
-  }, [profile?.turma_id, viewTurmaId]);
-
-  // Buscar tarefas usando o hook otimizado
-  const { tasks, loading, isOnline, pendingCount, fetchTasks, createTask, completeTask, deleteTask } =
-    useTasks(tab, viewTurmaId || undefined);
+  const { tasks, loading, error, isOnline, pendingCount, fetchTasks, createTask, completeTask, deleteTask } = useTasks(tab, viewTurmaId || undefined);
 
   // Novos Estados
   const [viewMode, setViewMode] = useState<"lista" | "cards" | "kanban">("lista");
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<"todos" | "provas" | "trabalhos" | "atividades" | "avisos">("todos");
+  const [categoryFilter, setCategoryFilter] = useState<string>("todos");
   
   // Controle de Abas Recolhidas (Collapsible sections)
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     concluidas: true // Por padrão, as concluídas começam recolhidas
   });
 
-  // Estado para Sincronização Google Calendar
-  const [syncingGCal, setSyncingGCal] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   // Manipular alternância de recolhimento
   const toggleSection = (section: string) => {
@@ -71,10 +64,10 @@ export function Tasks() {
 
       // 2. Filtro por categoria (mapeado por cor)
       if (categoryFilter !== "todos") {
-        if (categoryFilter === "provas" && t.shape_color !== "#E85D5D") return false;
-        if (categoryFilter === "trabalhos" && t.shape_color !== "#E8C84A") return false;
-        if (categoryFilter === "atividades" && t.shape_color !== "#7A8F6B") return false;
-        if (categoryFilter === "avisos" && t.shape_color !== "#5B8DEF" && t.shape_color !== "#C77DFF" && t.shape_color !== "#666") return false;
+        if (categoryFilter === "provas" && t.shape_color !== CATEGORY_COLORS.provas) return false;
+        if (categoryFilter === "trabalhos" && t.shape_color !== CATEGORY_COLORS.trabalhos) return false;
+        if (categoryFilter === "atividades" && t.shape_color !== CATEGORY_COLORS.atividades) return false;
+        if (categoryFilter === "avisos" && !CATEGORY_COLORS.avisos.includes(t.shape_color as any)) return false;
       }
 
       return true;
@@ -148,210 +141,7 @@ export function Tasks() {
     setShowCreateModal(false);
   };
 
-  // Manipular Sincronização Google Calendar
-  const handleSyncGCal = async () => {
-    if (!user) return;
-    setSyncingGCal(true);
-    setSyncMessage(null);
 
-    try {
-      const result = await syncAllWithGoogleCalendar(user.id);
-      if (result.success) {
-        setSyncMessage(`Agenda integrada! ${result.syncedCount} evento(s) adicionado(s)/removido(s).`);
-        setTimeout(() => setSyncMessage(null), 5000);
-        fetchTasks(); // Atualizar a lista local para refletir IDs do Google Calendar
-      } else {
-        setSyncMessage(`Erro de sincronização: ${result.error || "Tente novamente."}`);
-        setTimeout(() => setSyncMessage(null), 5000);
-      }
-    } catch (err) {
-      console.error(err);
-      setSyncMessage("Erro inesperado na conexão com o Google.");
-      setTimeout(() => setSyncMessage(null), 5000);
-    } finally {
-      setSyncingGCal(false);
-    }
-  };
-
-  // Auxiliar para obter rótulo do período
-  const getPeriodLabel = (p?: string | null) => {
-    if (p === "manha") return "☀️ Manhã";
-    if (p === "tarde") return "⛅ Tarde";
-    if (p === "noite") return "🌙 Noite";
-    return null;
-  };
-
-  // Auxiliar para formatar data (DD/MM)
-  const formatDateLabel = (dateStr?: string | null) => {
-    if (!dateStr) return "";
-    const [year, month, day] = dateStr.split("-");
-    return `${day}/${month}`;
-  };
-
-  // COMPONENTE: Renderizar uma Tarefa no MODO LISTA
-  const RenderTaskRow = ({ task }: { task: typeof tasks[0] }) => {
-    const isOverdue = task.due_date && !task.completed && new Date(task.due_date + "T00:00:00") < new Date(new Date().toISOString().split("T")[0] + "T00:00:00");
-    
-    return (
-      <motion.div
-        layout
-        initial={{ opacity: 0, y: 5 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -5 }}
-        className="flex items-center gap-4 h-[58px] rounded-xl px-4 mb-2.5 border border-white/[0.04] bg-zinc-900/30 hover:bg-zinc-900/50 hover:border-white/[0.08] transition-all group"
-      >
-        {/* Marcador Categoria */}
-        <div className="shrink-0 flex items-center justify-center">
-          <span
-            className="w-3.5 h-3.5 rounded-full block shadow-sm shadow-black/30"
-            style={{
-              backgroundColor: task.shape_color || "#666",
-              border: `1px solid rgba(255,255,255,0.15)`
-            }}
-          />
-        </div>
-
-        {/* Título e Descrição Rápida */}
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <span className={`text-[14px] font-medium truncate ${task.completed ? "line-through text-zinc-600" : "text-white"}`}>
-            {task.title}
-          </span>
-          {task.description && (
-            <span className="text-[11px] text-zinc-500 truncate max-w-[400px]">
-              {task.description}
-            </span>
-          )}
-        </div>
-
-        {/* Sync Status Badge */}
-        <SyncStatusBadge isOnline={isOnline} pendingCount={0} syncStatus={task.sync_status} />
-
-        {/* Badges de Turno e Data */}
-        <div className="flex items-center gap-2 shrink-0">
-          {getPeriodLabel(task.period) && (
-            <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-medium">
-              {getPeriodLabel(task.period)}
-            </span>
-          )}
-          {task.due_date && (
-            <span className={`text-[11px] font-medium flex items-center gap-1 px-2 py-0.5 rounded-full ${
-              task.completed
-                ? "bg-zinc-800/40 text-zinc-600"
-                : isOverdue
-                ? "bg-red-500/10 text-red-400 border border-red-500/15"
-                : "bg-[#7A8F6B]/10 text-[#9EBF8A] border border-[#7A8F6B]/15"
-            }`}>
-              {isOverdue && <AlertCircle size={10} />}
-              {formatDateLabel(task.due_date)} {task.due_time || ""}
-            </span>
-          )}
-        </div>
-
-        {/* Ações (Visíveis no Hover no desktop, ativas no mobile) */}
-        <div className="flex items-center gap-1.5 shrink-0 opacity-80 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-          {!task.completed && (
-            <button
-              onClick={() => completeTask(task.id)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/15 text-emerald-400 transition-colors cursor-pointer"
-            >
-              <Check size={14} />
-            </button>
-          )}
-          <button
-            onClick={() => deleteTask(task.id)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center bg-red-500/10 hover:bg-red-500/25 border border-red-500/15 text-red-400 transition-colors cursor-pointer"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </motion.div>
-    );
-  };
-
-  // COMPONENTE: Renderizar uma Tarefa no MODO CARDS (Glassmorphic)
-  const RenderTaskCard = ({ task }: { task: typeof tasks[0] }) => {
-    const isOverdue = task.due_date && !task.completed && new Date(task.due_date + "T00:00:00") < new Date(new Date().toISOString().split("T")[0] + "T00:00:00");
-    
-    return (
-      <motion.div
-        layout
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="relative flex flex-col justify-between overflow-hidden p-5 rounded-2xl border border-white/[0.05] bg-zinc-900/40 backdrop-blur-md hover:border-white/[0.09] hover:bg-zinc-900/60 shadow-lg shadow-black/15 transition-all duration-300 group"
-      >
-        {/* Faixa lateral decorativa de categoria */}
-        <div
-          className="absolute left-0 top-0 bottom-0 w-1.5"
-          style={{ backgroundColor: task.shape_color || "#666" }}
-        />
-
-        {/* Topo do Card: Título e Status */}
-        <div className="pl-2">
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <h4 className={`text-[15px] font-semibold tracking-tight ${task.completed ? "line-through text-zinc-600" : "text-white"}`}>
-              {task.title}
-            </h4>
-            <div className="shrink-0 flex items-center gap-1.5">
-              <SyncStatusBadge isOnline={isOnline} pendingCount={0} syncStatus={task.sync_status} />
-              {task.google_calendar_event_id && (
-                <span>
-                  <Calendar size={12} className="text-[#9EBF8A]/70" />
-                </span>
-              )}
-            </div>
-          </div>
-          
-          {/* Descrição */}
-          <p className={`text-[12px] font-light min-h-[36px] line-clamp-2 leading-relaxed mb-4 ${task.completed ? "text-zinc-700" : "text-zinc-400"}`}>
-            {task.description || <span className="text-zinc-700 italic">Sem descrição.</span>}
-          </p>
-        </div>
-
-        {/* Rodapé do Card: Tags e Botões de Ação */}
-        <div className="pl-2 pt-3 border-t border-white/[0.03] flex items-center justify-between gap-2 mt-auto">
-          {/* Tags */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {getPeriodLabel(task.period) && (
-              <span className="text-[9px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-500 font-medium">
-                {getPeriodLabel(task.period)}
-              </span>
-            )}
-            {task.due_date && (
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                task.completed
-                  ? "bg-zinc-800/40 text-zinc-600"
-                  : isOverdue
-                  ? "bg-red-500/10 text-red-400 border border-red-500/15"
-                  : "bg-[#7A8F6B]/10 text-[#9EBF8A] border border-[#7A8F6B]/15"
-              }`}>
-                {isOverdue && <AlertCircle size={9} />}
-                {formatDateLabel(task.due_date)} {task.due_time || ""}
-              </span>
-            )}
-          </div>
-
-          {/* Botões de Ação Rápida */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {!task.completed && (
-              <button
-                onClick={() => completeTask(task.id)}
-                className="w-8 h-8 rounded-xl flex items-center justify-center bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/15 text-emerald-400 transition-all cursor-pointer active:scale-90"
-              >
-                <Check size={14} />
-              </button>
-            )}
-            <button
-              onClick={() => deleteTask(task.id)}
-              className="w-8 h-8 rounded-xl flex items-center justify-center bg-red-500/10 hover:bg-red-500/25 border border-red-500/15 text-red-400 transition-all cursor-pointer active:scale-90"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    );
-  };
 
   // RENDER SEÇÃO AGRUPADA
   const RenderGroupSection = (title: string, items: typeof tasks, secKey: string, iconColor = "text-[#7A8F6B]") => {
@@ -390,13 +180,13 @@ export function Tasks() {
               {viewMode === "lista" ? (
                 <div className="flex flex-col">
                   {items.map((t) => (
-                    <RenderTaskRow key={t.id} task={t} />
+                    <TaskRow key={t.id} task={t} isOnline={isOnline} onComplete={completeTask} onDelete={deleteTask} />
                   ))}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-2">
                   {items.map((t) => (
-                    <RenderTaskCard key={t.id} task={t} />
+                    <TaskCard key={t.id} task={t} isOnline={isOnline} onComplete={completeTask} onDelete={deleteTask} />
                   ))}
                 </div>
               )}
@@ -407,11 +197,10 @@ export function Tasks() {
     );
   };
 
-  const activeTurmaName = userTurmas?.find(t => t.id === viewTurmaId)?.name || 'Carregando...';
 
   return (
     <div className="flex-1 flex flex-col pb-24 md:pb-6 overflow-auto">
-      <PageHeader tab={tab} onTabChange={setTab} viewTurmaId={viewTurmaId} setViewTurmaId={setViewTurmaId} hideGeral={!profile?.turma_id} />
+      <PageHeader tab={tab} onTabChange={setTab} viewTurmaId={viewTurmaId || undefined} setViewTurmaId={setViewTurmaId} hideGeral={!profile?.turma_id} />
 
       {/* Greeting + Sync Status */}
       <div className="px-7 mb-5">
@@ -428,42 +217,13 @@ export function Tasks() {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Botão de Integração Google Calendar */}
-            <button
-              onClick={handleSyncGCal}
-              disabled={syncingGCal}
-              className={`h-9 px-3.5 rounded-xl text-[12px] font-semibold flex items-center gap-2 border transition-all select-none ${
-                syncingGCal
-                  ? "bg-zinc-800 border-zinc-700 text-zinc-400 cursor-not-allowed"
-                  : "bg-[#7A8F6B]/10 border-[#7A8F6B]/20 text-[#9EBF8A] hover:bg-[#7A8F6B]/25 hover:border-[#7A8F6B]/30 active:scale-95 cursor-pointer"
-              }`}
-            >
-              {syncingGCal ? (
-                <RefreshCw size={14} className="animate-spin text-[#9EBF8A]" />
-              ) : (
-                <Calendar size={14} className="text-[#9EBF8A]" />
-              )}
-              <span>{syncingGCal ? "Integrando..." : "Integrar Google Calendar"}</span>
-            </button>
-
+            <GCalSyncButton onSync={handleSyncGCal} isSyncing={syncingGCal} />
+            
             <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} />
           </div>
         </div>
 
-        {/* Notificação da Sincronização Google Calendar */}
-        <AnimatePresence>
-          {syncMessage && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="mt-3 p-3 rounded-xl border border-white/[0.06] bg-zinc-950/80 text-[12px] text-zinc-300 flex items-center gap-2 shadow-lg backdrop-blur-sm"
-            >
-              <CheckCircle2 size={14} className="text-[#9EBF8A] shrink-0" />
-              <span>{syncMessage}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <SyncNotification message={syncMessage} />
       </div>
 
       {/* Separator */}
@@ -474,12 +234,13 @@ export function Tasks() {
         <div className="flex flex-col md:flex-row md:items-center gap-4 bg-zinc-900/30 border border-white/[0.04] p-4 rounded-2xl">
           {/* Input de Busca */}
           <div className="flex-1 relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 w-4.5 h-4.5" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 w-4.5 h-4.5" aria-hidden="true" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar por título ou descrição..."
+              aria-label="Buscar tarefas por título ou descrição"
               className="w-full h-10 pl-11 pr-4 bg-zinc-950 border border-white/[0.04] focus:border-[#7A8F6B]/30 rounded-xl text-[13px] text-white placeholder-zinc-700 outline-none transition-all"
             />
           </div>
@@ -487,25 +248,7 @@ export function Tasks() {
           {/* Filtro por Categoria rápido */}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[11px] text-zinc-500 font-medium mr-1 uppercase tracking-wider">Tipo:</span>
-            {[
-              { id: "todos", label: "Tudo" },
-              { id: "provas", label: "Provas 🔴" },
-              { id: "trabalhos", label: "Trabalhos 🟡" },
-              { id: "atividades", label: "Atividades 🟢" },
-              { id: "avisos", label: "Avisos 🔵" }
-            ].map(c => (
-              <button
-                key={c.id}
-                onClick={() => setCategoryFilter(c.id as any)}
-                className={`h-8 px-3 rounded-xl text-[11px] font-medium border select-none transition-all active:scale-95 ${
-                  categoryFilter === c.id
-                    ? "bg-[#7A8F6B] border-[#7A8F6B] text-zinc-950 font-bold"
-                    : "bg-zinc-950 border-white/[0.04] text-zinc-400 hover:text-white"
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
+            <CategoryFilter currentFilter={categoryFilter} onFilterChange={setCategoryFilter} variant="tasks" />
           </div>
 
           {/* Alternador de Layout Lista / Cards */}
@@ -514,30 +257,36 @@ export function Tasks() {
             <div className="flex items-center bg-zinc-950 p-1 rounded-xl border border-white/[0.04] relative">
               <button
                 onClick={() => setViewMode("lista")}
+                aria-label="Visualização em Lista"
+                aria-pressed={viewMode === "lista"}
                 className={`h-8 w-10 flex items-center justify-center rounded-lg transition-all ${
                   viewMode === "lista" ? "bg-[#7A8F6B] text-zinc-950" : "text-zinc-500 hover:text-white"
                 }`}
                 title="Modo Lista"
               >
-                <List size={16} />
+                <List size={16} aria-hidden="true" />
               </button>
               <button
                 onClick={() => setViewMode("cards")}
+                aria-label="Visualização em Cards"
+                aria-pressed={viewMode === "cards"}
                 className={`h-8 w-10 flex items-center justify-center rounded-lg transition-all ${
                   viewMode === "cards" ? "bg-[#7A8F6B] text-zinc-950" : "text-zinc-500 hover:text-white"
                 }`}
                 title="Modo Cards"
               >
-                <Grid size={16} />
+                <Grid size={16} aria-hidden="true" />
               </button>
               <button
                 onClick={() => setViewMode("kanban")}
+                aria-label="Visualização Kanban"
+                aria-pressed={viewMode === "kanban"}
                 className={`h-8 w-10 flex items-center justify-center rounded-lg transition-all ${
                   viewMode === "kanban" ? "bg-[#7A8F6B] text-zinc-950" : "text-zinc-500 hover:text-white"
                 }`}
                 title="Modo Kanban"
               >
-                <SlidersHorizontal size={15} />
+                <SlidersHorizontal size={15} aria-hidden="true" />
               </button>
             </div>
           </div>

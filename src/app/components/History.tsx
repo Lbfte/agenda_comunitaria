@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { PageHeader } from "./PageHeader";
+import { PageHeader } from "./layout/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { useHistory } from "../hooks/useHistory";
 import { RefreshCw, Calendar, ArrowRight, CheckCircle2 } from "lucide-react";

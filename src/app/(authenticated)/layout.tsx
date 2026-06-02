@@ -2,9 +2,9 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Sidebar } from "@/app/components/Sidebar";
-import { BottomNav } from "@/app/components/BottomNav";
-import { SplashScreen } from "@/app/components/SplashScreen";
+import { Sidebar } from "@/app/components/layout/Sidebar";
+import { BottomNav } from "@/app/components/layout/BottomNav";
+import { SplashScreen } from "@/app/components/layout/SplashScreen";
 import { LoginPage } from "@/app/components/LoginPage";
 import { useAuth } from "@/app/contexts/AuthContext";
 
